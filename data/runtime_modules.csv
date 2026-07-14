@@ -1,0 +1,5 @@
+name,status,health_score
+config,active,98
+state,inactive,62
+cli,active,91
+logger,inactive,70
