@@ -7,3 +7,7 @@ A learning-first AI engineering project built with Python.
 uv sync
 
 Status: Early development
+
+## Configuration
+
+Copy `.env.example` to `.env` and provide the required local values.
