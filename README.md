@@ -5,3 +5,5 @@ A learning-first AI engineering project built with Python.
 ## Setup
 
 uv sync
+
+Status: Early development
