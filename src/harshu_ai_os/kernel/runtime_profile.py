@@ -10,7 +10,7 @@ class RuntimeProfile:
     version: str = "0.1.0"
 
     def show_summary(self) -> str:
-        return f"{self.system_name}\n{self.mode}\n{self.version}"
+        return f"System: {self.system_name}\nMode: {self.mode}\nVersion: {self.version}"
 
 
 if __name__ == "__main__":
