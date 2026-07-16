@@ -25,7 +25,7 @@ SYSTEM_PROMPT = (
 SIMPLE_MODEL = "groq/llama-3.1-8b-instant"
 GENERAL_MODEL = "gemini/gemini-2.5-flash"
 REASONING_MODEL = "groq/openai/gpt-oss-20b"
-CLASSIFIER_MODEL = "gemini/gemini-2.5-flash-lite"
+CLASSIFIER_MODEL = "gemini/gemini-2.5-flash"
 
 
 class TaskClassification(BaseModel):

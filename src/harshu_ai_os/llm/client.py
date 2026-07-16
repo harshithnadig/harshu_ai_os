@@ -1,4 +1,3 @@
-from litellm import ModelResponse
 from litellm import completion
 from harshu_ai_os.llm.messages import build_messages
 
@@ -10,7 +9,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def call_llm(route: dict, user_prompt: str)-> ModelResponse:
+def call_llm(route: dict, user_prompt: str)-> str:
 
     messages = build_messages(
         SYSTEM_PROMPT,
@@ -26,4 +25,6 @@ def call_llm(route: dict, user_prompt: str)-> ModelResponse:
     if "reasoning_effort" in route:
         completion_args["reasoning_effort"] = route["reasoning_effort"]
 
-    return completion(**completion_args)
+    response = completion(**completion_args)
+
+    return response.choices[0].message.content
