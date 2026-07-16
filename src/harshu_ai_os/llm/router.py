@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Literal
 
 from harshu_ai_os.llm.messages import build_messages
+from harshu_ai_os.llm.client import call_llm
 
 
 load_dotenv()
@@ -100,29 +101,11 @@ def choose_route(task_type: str) -> dict:
     raise ValueError(f"Unknown task type: {task_type}")
 
 
-def call_model(route: dict, user_prompt: str):
 
-    messages = build_messages(
-        SYSTEM_PROMPT,
-        user_prompt,
-    )
-
-    completion_args = {
-        "model": route["model"],
-        "messages": messages,
-        "max_completion_tokens": route["max_tokens"],
-        "timeout": 30,
-        "temperature": 0.0,
-    }
-
-    if "reasoning_effort" in route:
-        completion_args["reasoning_effort"] = route["reasoning_effort"]
-
-    return completion(**completion_args)
 
 
 if __name__ == "__main__":
-
+  try:
     sys.stdout.reconfigure(encoding="utf-8")
 
     user_prompt = input("Ask me anything: ")
@@ -131,7 +114,7 @@ if __name__ == "__main__":
 
     route = choose_route(classification.complexity)
 
-    response = call_model(
+    response = call_llm(
         route,
         user_prompt,
     )
@@ -143,3 +126,7 @@ if __name__ == "__main__":
     print("Reply:", response.choices[0].message.content)
     print("Finish reason:", response.choices[0].finish_reason)
     print("Usage:", response.usage)
+  except Exception:
+        print(
+            "AI service is temporarily unavailable. Please try again."
+        )
