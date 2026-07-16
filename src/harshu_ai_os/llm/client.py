@@ -26,5 +26,6 @@ def call_llm(route: dict, user_prompt: str)-> str:
         completion_args["reasoning_effort"] = route["reasoning_effort"]
 
     response = completion(**completion_args)
+    
 
     return response.choices[0].message.content

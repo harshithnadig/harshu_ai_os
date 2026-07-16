@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 from harshu_ai_os.api.schemas import AskRequest, AskResponse
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
 from harshu_ai_os.llm.client import call_llm
+from harshu_ai_os.kernel.logger import get_logger
+
 
 app = FastAPI()
 
@@ -13,20 +15,28 @@ def health_check():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest):
+    try:
+        classification = classify_task_with_model(request.question)
 
-    classification = classify_task_with_model(request.question)
+        logger = get_logger(__name__)
 
-    print(classification)
+        logger.info(classification)
 
-    route = choose_route(classification.complexity)
-    print(route)
+        route = choose_route(classification.complexity)
 
-    result = call_llm(route,request.question)
-   
+        logger.info(route)
 
-    return {
-        "question": request.question,
-        "complexity": classification.complexity,
-        "answer": result,
-        "model": route["model"]
-    }
+        result = call_llm(route, request.question)
+
+        logger.info("model=%s", route["model"])
+        return {
+            "question": request.question,
+            "complexity": classification.complexity,
+            "answer": result,
+            "model": route["model"]
+        }
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="AI service temporarily unavailable"
+        )
