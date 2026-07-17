@@ -1,5 +1,7 @@
 from litellm import completion
 from harshu_ai_os.llm.messages import build_messages
+from harshu_ai_os.llm.exceptions import LLMServiceError
+from litellm import ServiceUnavailableError
 
 
 SYSTEM_PROMPT = (
@@ -10,22 +12,23 @@ SYSTEM_PROMPT = (
 
 
 def call_llm(route: dict, user_prompt: str)-> str:
+    try:
+        messages = build_messages(
+            SYSTEM_PROMPT,
+            user_prompt,
+        )
+        completion_args = {
+            "model": route["model"],
+            "messages": messages,
+            "max_completion_tokens": route["max_tokens"],
+            "timeout": 30,
+            "temperature": 0.0,
+        }
+        if "reasoning_effort" in route:
+            completion_args["reasoning_effort"] = route["reasoning_effort"]
 
-    messages = build_messages(
-        SYSTEM_PROMPT,
-        user_prompt,
-    )
-    completion_args = {
-        "model": route["model"],
-        "messages": messages,
-        "max_completion_tokens": route["max_tokens"],
-        "timeout": 30,
-        "temperature": 0.0,
-    }
-    if "reasoning_effort" in route:
-        completion_args["reasoning_effort"] = route["reasoning_effort"]
+        response = completion(**completion_args)
+        return response.choices[0].message.content
 
-    response = completion(**completion_args)
-    
-
-    return response.choices[0].message.content
+    except ServiceUnavailableError:
+        raise LLMServiceError("AI service is temporarily unavailable. Please try again.")

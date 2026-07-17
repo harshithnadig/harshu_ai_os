@@ -123,9 +123,8 @@ if __name__ == "__main__":
     print("Task type:", classification.complexity)
     print("Chosen model:", route["model"])
     print("Token budget:", route["max_tokens"])
-    print("Reply:", response.choices[0].message.content)
-    print("Finish reason:", response.choices[0].finish_reason)
-    print("Usage:", response.usage)
+    print("Reply:", response)
+
   except Exception:
         print(
             "AI service is temporarily unavailable. Please try again."
