@@ -4,8 +4,12 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.139.1",
+    "google-genai>=2.12.1",
     "litellm>=1.92.0",
+    "numpy>=2.5.1",
     "python-dotenv==1.2.2",
+    "scikit-learn>=1.9.0",
+    "tenacity>=9.1.4",
     "uvicorn>=0.51.0",
 ]
 

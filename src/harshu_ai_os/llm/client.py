@@ -1,7 +1,22 @@
 from litellm import completion
 from harshu_ai_os.llm.messages import build_messages
 from harshu_ai_os.llm.exceptions import LLMServiceError
-from litellm import ServiceUnavailableError
+from litellm.exceptions import ServiceUnavailableError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=5),
+    retry=retry_if_exception_type(ServiceUnavailableError),
+)
+def make_llm_call(completion_args: dict):
+    return completion(**completion_args)
 
 
 SYSTEM_PROMPT = (
@@ -11,7 +26,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def call_llm(route: dict, user_prompt: str)-> str:
+def call_llm(route: dict, user_prompt: str) -> str:
     try:
         messages = build_messages(
             SYSTEM_PROMPT,
@@ -27,8 +42,10 @@ def call_llm(route: dict, user_prompt: str)-> str:
         if "reasoning_effort" in route:
             completion_args["reasoning_effort"] = route["reasoning_effort"]
 
-        response = completion(**completion_args)
+        response = make_llm_call(completion_args)
         return response.choices[0].message.content
 
     except ServiceUnavailableError:
-        raise LLMServiceError("AI service is temporarily unavailable. Please try again.")
+        raise LLMServiceError(
+            "AI service is temporarily unavailable. Please try again."
+        )
