@@ -14,6 +14,7 @@ from tenacity import (
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     retry=retry_if_exception_type(ServiceUnavailableError),
+    reraise=True
 )
 def make_llm_call(completion_args: dict):
     return completion(**completion_args)
