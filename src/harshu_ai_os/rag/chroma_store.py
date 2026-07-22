@@ -46,3 +46,23 @@ def upsert_notes(collection, client, notes):
     )
 
     return ids
+
+def query_notes(collection, client, question):
+    if not question.strip():
+        raise ValueError("Question cannot be empty.")
+
+    question_embedding = embed_text(client, question)
+    results = collection.query(
+        query_embeddings=[question_embedding],
+        n_results=3,
+    )
+    
+    if not results["documents"] or not results["documents"][0]:
+        raise ValueError("No matching notes found.")
+
+    return {
+        "ids": results["ids"][0],
+        "texts": results["documents"][0],
+        "distances": results["distances"][0],
+        "metadatas": results["metadatas"][0],
+    }

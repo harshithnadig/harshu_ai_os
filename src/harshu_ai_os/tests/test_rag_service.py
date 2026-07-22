@@ -1,5 +1,9 @@
-from harshu_ai_os.rag.service import answer_with_rag
+from harshu_ai_os.rag.service import (
+    answer_with_chroma_rag,
+    answer_with_rag,
+)
 import pytest
+
 
 def test_answer_with_rag_rejects_empty_question_before_dependencies():
     with pytest.raises(
@@ -38,6 +42,24 @@ class FakeClient:
     def __init__(self):
         self.models = FakeModels()
 
+class FakeCollection:
+    def query(self, query_embeddings, n_results):
+        assert query_embeddings == [[1.0, 0.0]]
+        assert n_results == 3
+
+        return {
+            "ids": [["note-1", "note-0"]],
+            "documents": [[
+                "Harshu AI OS is tested using Pytest.",
+                "FastAPI exposes the endpoint.",
+            ]],
+            "distances": [[0.0, 1.0]],
+            "metadatas": [[
+                {"source": "manual", "position": 1},
+                {"source": "manual", "position": 0},
+            ]],
+        }
+
 
 def test_answer_with_rag_returns_answer_and_retrieval_evidence():
     client = FakeClient()
@@ -62,3 +84,30 @@ def test_answer_with_rag_returns_answer_and_retrieval_evidence():
     assert result["context"] == "Harshu AI OS is tested using Pytest."
     assert result["index"] == 1
     assert result["score"] == 1.0
+
+def test_answer_with_chroma_rag_returns_grounded_answer_and_evidence():
+    collection = FakeCollection()
+    client = FakeClient()
+
+    def fake_generate_text(prompt):
+        assert "Harshu AI OS is tested using Pytest." in prompt
+        assert "FastAPI exposes the endpoint." in prompt
+        assert "How is Harshu AI OS tested?" in prompt
+
+        return "Harshu AI OS is tested using Pytest."
+
+    result = answer_with_chroma_rag(
+        collection,
+        client,
+        "How is Harshu AI OS tested?",
+        fake_generate_text,
+    )
+
+    assert result["answer"] == "Harshu AI OS is tested using Pytest."
+    assert result["ids"] == ["note-1", "note-0"]
+    assert result["distances"] == [0.0, 1.0]
+    assert result["metadatas"][0]["position"] == 1
+    assert result["context"] == (
+        "Harshu AI OS is tested using Pytest.\n\n"
+        "FastAPI exposes the endpoint."
+    )
