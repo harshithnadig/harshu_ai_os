@@ -1,0 +1,5 @@
+Harshu AI OS is a learning project that demonstrates how an AI application can route questions to different language models.
+
+The system uses FastAPI to expose API endpoints. Pydantic validates incoming requests and outgoing responses.
+
+ChromaDB is used in Harshu AI OS. It stores document embeddings and retrieves relevant document chunks before the language model creates a grounded answer. The RAG component converts document text into those embeddings.

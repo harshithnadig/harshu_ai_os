@@ -1,12 +1,31 @@
+# Environment variables and API keys
 .env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+
+# Python cache & virtual environment
 .venv/
 __pycache__/
 *.py[cod]
+*$py.class
+.pytest_cache/
+
+# Data and Chroma database
+data/
+data/chroma/
+
+# Node modules & frontend builds
+node_modules/
+frontend/dist/
+dist/
+build/
+
+# IDE & temporary files
 jupyter/
 revision/
 requirements.txt
 src/harshu_ai_os/kernel/performance_practice.py
 src/harshu_ai_os/kernel/runtime_output.txt
-data/
-frontend/node_modules/
-frontend/dist/
