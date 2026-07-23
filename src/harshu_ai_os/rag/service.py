@@ -37,6 +37,7 @@ def answer_with_chroma_rag(
         raise ValueError("Question cannot be empty.")
 
     retrieval = query_notes(collection, client, question)
+    citations = build_citations(retrieval)
     context = "\n\n".join(retrieval["texts"])
     prompt = build_grounded_prompt(
         question,
@@ -51,4 +52,24 @@ def answer_with_chroma_rag(
         "distances": retrieval["distances"],
         "ids": retrieval["ids"],
         "metadatas": retrieval["metadatas"],
+        "citations": citations,
     }
+
+def build_citations(retrieval: dict) -> list[dict]:
+    citations = []
+
+    for chunk_id, distance, metadata in zip(
+        retrieval["ids"],
+        retrieval["distances"],
+        retrieval["metadatas"],
+    ):
+        citations.append(
+            {
+                "source": metadata["source"],
+                "chunk_id": chunk_id,
+                "chunk_index": metadata.get("chunk_index"),
+                "distance": distance,
+            }
+        )
+
+    return citations

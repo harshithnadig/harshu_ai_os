@@ -66,3 +66,32 @@ def query_notes(collection, client, question):
         "distances": results["distances"][0],
         "metadatas": results["metadatas"][0],
     }
+
+def upsert_chunk_records(collection, client, records):
+    if not records:
+        raise ValueError("At least one chunk record is required.")
+
+    ids = []
+    documents = []
+    embeddings = []
+    metadatas = []
+
+    for record in records:
+        ids.append(record["id"])
+        documents.append(record["text"])
+        embeddings.append(embed_text(client, record["text"]))
+        metadatas.append(
+            {
+                "source": record["source"],
+                "chunk_index": record["chunk_index"],
+        }
+    )
+
+    collection.upsert(
+        ids=ids,
+        documents=documents,
+        embeddings=embeddings,
+        metadatas=metadatas,
+    )
+
+    return ids

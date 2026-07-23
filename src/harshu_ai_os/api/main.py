@@ -84,6 +84,7 @@ def ask_rag(request: AskRequest):
             "distances": result["distances"],
             "ids": result["ids"],
             "metadatas": result["metadatas"],
+            "citations": result["citations"]
         }
 
     except LLMServiceError as error:

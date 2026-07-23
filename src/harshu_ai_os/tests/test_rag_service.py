@@ -111,3 +111,17 @@ def test_answer_with_chroma_rag_returns_grounded_answer_and_evidence():
         "Harshu AI OS is tested using Pytest.\n\n"
         "FastAPI exposes the endpoint."
     )
+    assert result["citations"] == [
+        {
+            "source": "manual",
+            "chunk_id": "note-1",
+            "chunk_index": None,
+            "distance": 0.0,
+        },
+        {
+            "source": "manual",
+            "chunk_id": "note-0",
+            "chunk_index": None,
+            "distance": 1.0,
+        },
+    ]

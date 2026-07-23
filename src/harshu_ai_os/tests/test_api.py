@@ -107,19 +107,26 @@ def fake_answer_with_chroma_rag(
     assert collection is not None
     assert embedding_client is not None
     assert generate_text is not None
-
     return {
         "answer": "ChromaDB retrieves relevant stored notes.",
         "context": "ChromaDB stores embeddings and retrieves notes.",
         "distances": [0.2],
         "ids": ["note-2"],
         "metadatas": [
-            {
-                "source": "manual",
-                "position": 2,
-            }
-        ],
-    }
+        {
+            "source": "manual",
+            "position": 2,
+        }
+    ],
+    "citations": [
+        {
+            "source": "manual",
+            "chunk_id": "note-2",
+            "chunk_index": None,
+            "distance": 0.2,
+        }
+    ],
+}
 
 def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     monkeypatch.setattr(
@@ -159,3 +166,11 @@ def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     assert data["distances"] == [0.2]
     assert data["metadatas"][0]["position"] == 2
     assert "ChromaDB stores embeddings" in data["context"]
+    assert data["citations"] == [
+    {
+        "source": "manual",
+        "chunk_id": "note-2",
+        "chunk_index": None,
+        "distance": 0.2,
+    }
+]

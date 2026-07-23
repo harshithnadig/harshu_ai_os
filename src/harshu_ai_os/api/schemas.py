@@ -11,6 +11,12 @@ class AskResponse(BaseModel):
     complexity: str
     model: str
 
+class Citation(BaseModel):
+    source: str
+    chunk_id: str
+    chunk_index: int | None
+    distance: float
+
 class AskRagResponse(BaseModel):
     answer: str
     complexity: str
@@ -19,3 +25,4 @@ class AskRagResponse(BaseModel):
     distances: list[float]
     ids: list[str]
     metadatas: list[dict[str, Any]]
+    citations: list[Citation]
