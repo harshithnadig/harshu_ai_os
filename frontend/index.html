@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090b14" />
+    <meta name="description" content="A focused interface for Harshu AI OS." />
+    <title>Harshu AI OS</title>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    <div class="page-grid" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Harshu AI OS home">
+          <span class="brand-mark" aria-hidden="true">✦</span>
+          <span>HARSHU <em>AI OS</em></span>
+        </a>
+        <div class="header-meta">
+          <span class="edition">PERSONAL INTELLIGENCE</span>
+          <span class="status"><i></i> SYSTEM ONLINE</span>
+        </div>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-content">
+          <p class="eyebrow"><span></span> YOUR INTELLIGENCE, AMPLIFIED</p>
+          <h1 id="page-title">Think beyond<br /><span>the obvious.</span></h1>
+          <p class="hero-copy">One intelligent workspace for fast answers and grounded insight from the knowledge you trust.</p>
+          <div class="capabilities" aria-label="Capabilities">
+            <span><i>01</i> Adaptive routing</span>
+            <span><i>02</i> Source-aware RAG</span>
+          </div>
+        </div>
+
+        <div class="intelligence-visual" aria-hidden="true">
+          <div class="visual-halo"></div>
+          <div class="orbit orbit-outer"><i></i><i></i></div>
+          <div class="orbit orbit-mid"><i></i></div>
+          <div class="orbit orbit-inner"></div>
+          <div class="intelligence-core">
+            <div class="core-surface"><span>✦</span></div>
+          </div>
+          <div class="signal signal-one"><span>NORMAL</span><strong>Direct intelligence</strong></div>
+          <div class="signal signal-two"><span>RAG</span><strong>Grounded in context</strong></div>
+          <div class="visual-caption"><i></i> HARSHU CORE / ACTIVE</div>
+        </div>
+      </section>
+
+      <section class="ask-card" aria-label="Ask Harshu AI OS">
+        <div class="composer-header">
+          <div>
+            <span class="composer-kicker">NEW THOUGHT</span>
+            <strong>What’s on your mind?</strong>
+          </div>
+          <div class="mode-switch" role="radiogroup" aria-label="Answer mode">
+            <button class="mode-button active" type="button" role="radio" aria-checked="true" data-mode="ask">
+              <span class="mode-icon">✦</span><span><strong>Normal</strong><small>Direct answer</small></span>
+            </button>
+            <button class="mode-button" type="button" role="radio" aria-checked="false" data-mode="rag">
+              <span class="mode-icon">⌘</span><span><strong>RAG</strong><small>Grounded answer</small></span>
+            </button>
+          </div>
+        </div>
+
+        <form id="ask-form">
+          <label class="sr-only" for="question">Your question</label>
+          <textarea id="question" name="question" rows="3" maxlength="8000" placeholder="Ask anything. Go as deep as you like..." required></textarea>
+          <div class="form-footer">
+            <span id="mode-hint"><i></i> Direct AI response</span>
+            <button id="submit-button" class="submit-button" type="submit"><span>Ask Harshu</span><b aria-hidden="true">↗</b></button>
+          </div>
+        </form>
+      </section>
+
+      <section id="result" class="result" aria-live="polite" hidden>
+        <div class="result-header">
+          <p class="eyebrow result-label" id="result-label"><span></span> RESPONSE</p>
+          <div id="metadata" class="metadata"></div>
+        </div>
+        <div id="answer" class="answer"></div>
+        <div id="rag-evidence" hidden>
+          <div class="citations-heading"><h2>Sources</h2><span>Retrieved evidence</span></div>
+          <div id="citations" class="citation-list"></div>
+          <details id="context-details">
+            <summary>View retrieved evidence</summary>
+            <pre id="context"></pre>
+          </details>
+        </div>
+      </section>
+
+      <section id="error" class="error-panel" role="alert" hidden>
+        <span aria-hidden="true">!</span>
+        <div><strong>We couldn’t complete that request.</strong><p id="error-message"></p></div>
+      </section>
+
+      <footer>
+        <span>DESIGNED FOR DEEPER THINKING</span>
+        <span>HARSHU AI OS · 2026</span>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

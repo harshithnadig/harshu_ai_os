@@ -1,5 +1,5 @@
-from harshu_ai_os.api.schemas import AskRagResponse
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.kernel.logger import get_logger
@@ -15,6 +15,15 @@ from harshu_ai_os.rag.generator import create_rag_generator
 from harshu_ai_os.rag.service import answer_with_chroma_rag
 
 app = FastAPI()
+
+# The standalone Vite client is only used during local development.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["POST"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
