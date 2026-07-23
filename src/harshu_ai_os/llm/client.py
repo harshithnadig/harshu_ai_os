@@ -42,6 +42,9 @@ def call_llm(route: dict, user_prompt: str) -> str:
         }
         if "reasoning_effort" in route:
             completion_args["reasoning_effort"] = route["reasoning_effort"]
+        if "thinking" in route:
+            completion_args["thinking"] = route["thinking"]
+
 
         response = make_llm_call(completion_args)
         return response.choices[0].message.content

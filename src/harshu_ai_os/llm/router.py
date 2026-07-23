@@ -89,6 +89,10 @@ def choose_route(task_type: str) -> dict:
         return {
             "model": GENERAL_MODEL,
             "max_tokens": 500,
+            "thinking": {
+                "type": "disabled",
+                "budget_tokens": 0,
+            },
         }
 
     if task_type == "complex":
