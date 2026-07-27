@@ -1,5 +1,7 @@
 import "./styles.css";
 
+// The frontend stays deliberately thin: the backend owns routing, retrieval,
+// provider calls, and citations; this file renders their typed response.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 const modeDescriptions = {
   ask: "Direct AI response",
@@ -66,6 +68,7 @@ function addMeta(label, value) {
 }
 
 function renderCitation(citation, index) {
+  // Use textContent instead of HTML interpolation for retrieved document data.
   const card = document.createElement("article");
   card.className = "citation-card";
   const title = document.createElement("h3");
@@ -103,6 +106,7 @@ form.addEventListener("submit", async (event) => {
   clearOutput();
   setLoading(true);
   try {
+    // Both modes share one UI; only the backend workflow changes.
     const endpoint = activeMode === "rag" ? "/ask/rag" : "/ask";
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: "POST",

@@ -1,8 +1,8 @@
 # Harshu AI OS
 
-Harshu AI OS is a learning-first AI engineering project with a FastAPI backend and a polished, responsive web interface. It supports direct AI questions and retrieval-augmented generation (RAG) over locally indexed notes.
+Harshu AI OS is a learning-first AI engineering project with a FastAPI backend and a responsive web interface. It supports direct AI questions and retrieval-augmented generation (RAG) over locally indexed notes.
 
-The project demonstrates model routing, embeddings, local vector retrieval, grounded answer generation, and structured citations without hiding the underlying implementation behind a large framework.
+The project demonstrates model routing, embeddings, local vector retrieval, grounded answer generation, and structured citations. LangChain is used only where it adds value to the RAG prompt-model-parser workflow; the direct endpoint remains a small LiteLLM call.
 
 ## Current features
 
@@ -17,6 +17,45 @@ The project demonstrates model routing, embeddings, local vector retrieval, grou
 - Friendly loading, backend, and network states
 - FastAPI request and response validation with Pydantic
 - Automated backend tests
+
+## Request flow
+
+Direct answers use the shortest path:
+
+```text
+Frontend → FastAPI → router → LiteLLM client → selected provider
+```
+
+RAG answers add retrieval and LangChain composition:
+
+```text
+Frontend → FastAPI → router → RAG service
+                              ├─ Chroma retrieval
+                              └─ LangChain prompt → selected model → parser
+                           → answer + citations
+```
+
+## Small codebase map
+
+```text
+api/main.py
+├─ /ask     → llm/router.py → llm/client.py
+└─ /ask/rag → rag/service.py
+               ├─ rag/chroma_store.py
+               ├─ rag/embedding_client.py
+               ├─ rag/ingestion.py
+               └─ llm/client.py
+
+kernel/
+├─ runtime.py      # shared configuration, identity, and logging
+├─ cli.py          # optional local interactive entry point
+└─ performance.py  # controlled Python/Big-O learning benchmark
+```
+
+The ordered learning references are indexed in
+[`jupyter/README.md`](jupyter/README.md). They explain the harder Python,
+routing, reliability, RAG, LangChain, testing, and API-flow concepts using
+synthetic examples and fake model responses.
 
 ## Prerequisites
 

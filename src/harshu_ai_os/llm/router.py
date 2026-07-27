@@ -1,26 +1,17 @@
-import sys
+"""Classify each request and select a logical model route."""
 
-import litellm
 from dotenv import load_dotenv
 from litellm import completion
-from pydantic import BaseModel
 from typing import Literal
 
-from harshu_ai_os.llm.messages import build_messages
-from harshu_ai_os.llm.client import call_llm
+from pydantic import BaseModel
+
+from harshu_ai_os.llm.client import build_messages
 
 
+# The classifier uses a direct LiteLLM call because it is intentionally small
+# and does not need RAG prompt composition.
 load_dotenv()
-
-litellm.drop_params = True
-
-
-SYSTEM_PROMPT = (
-    "You are the Harshu AI OS runtime assistant. "
-    "Answer clearly and concisely. Unless the user asks for detail, "
-    "keep the response under 150 words."
-)
-
 
 SIMPLE_MODEL = "groq/llama-3.1-8b-instant"
 GENERAL_MODEL = "gemini/gemini-2.5-flash"
@@ -29,13 +20,15 @@ CLASSIFIER_MODEL = "gemini/gemini-2.5-flash"
 
 
 class TaskClassification(BaseModel):
+    """Structured routing decision returned by the classifier model."""
+
     complexity: Literal["simple", "general", "complex"]
     needs_current_information: bool
     needs_tool: bool
 
 
 def classify_task_with_model(user_prompt: str) -> TaskClassification:
-
+    """Classify a request before any model route is selected."""
     classifier_system_prompt = (
         "You classify user requests for an AI router. "
         "Do not answer the request. "
@@ -78,7 +71,7 @@ def classify_task_with_model(user_prompt: str) -> TaskClassification:
 
 
 def choose_route(task_type: str) -> dict:
-
+    """Map a logical complexity level to provider and generation controls."""
     if task_type == "simple":
         return {
             "model": SIMPLE_MODEL,
@@ -103,33 +96,3 @@ def choose_route(task_type: str) -> dict:
         }
 
     raise ValueError(f"Unknown task type: {task_type}")
-
-
-
-
-
-if __name__ == "__main__":
-  try:
-    sys.stdout.reconfigure(encoding="utf-8")
-
-    user_prompt = input("Ask me anything: ")
-
-    classification = classify_task_with_model(user_prompt)
-
-    route = choose_route(classification.complexity)
-
-    response = call_llm(
-        route,
-        user_prompt,
-    )
-
-    print("Classification:", classification)
-    print("Task type:", classification.complexity)
-    print("Chosen model:", route["model"])
-    print("Token budget:", route["max_tokens"])
-    print("Reply:", response)
-
-  except Exception:
-        print(
-            "AI service is temporarily unavailable. Please try again."
-        )
