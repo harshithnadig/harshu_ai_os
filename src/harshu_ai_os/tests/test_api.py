@@ -85,6 +85,7 @@ def test_ask_endpoint_classifier_failure(monkeypatch):
 
     assert response.status_code == 503
 
+
 def fake_get_notes_collection():
     return object()
 
@@ -93,40 +94,37 @@ def fake_get_embedding_client():
     return object()
 
 
-def fake_create_rag_generator(route):
-    return object()
-
-
 def fake_answer_with_chroma_rag(
     collection,
     embedding_client,
     question,
-    generate_text,
+    route,
 ):
     assert question == "What does ChromaDB do?"
     assert collection is not None
     assert embedding_client is not None
-    assert generate_text is not None
+    assert route["model"] == "gemini/gemini-2.5-flash"
     return {
         "answer": "ChromaDB retrieves relevant stored notes.",
         "context": "ChromaDB stores embeddings and retrieves notes.",
         "distances": [0.2],
         "ids": ["note-2"],
         "metadatas": [
-        {
-            "source": "manual",
-            "position": 2,
-        }
-    ],
-    "citations": [
-        {
-            "source": "manual",
-            "chunk_id": "note-2",
-            "chunk_index": None,
-            "distance": 0.2,
-        }
-    ],
-}
+            {
+                "source": "manual",
+                "position": 2,
+            }
+        ],
+        "citations": [
+            {
+                "source": "manual",
+                "chunk_id": "note-2",
+                "chunk_index": None,
+                "distance": 0.2,
+            }
+        ],
+    }
+
 
 def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     monkeypatch.setattr(
@@ -140,10 +138,6 @@ def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     monkeypatch.setattr(
         "harshu_ai_os.api.main.get_embedding_client",
         fake_get_embedding_client,
-    )
-    monkeypatch.setattr(
-        "harshu_ai_os.api.main.create_rag_generator",
-        fake_create_rag_generator,
     )
     monkeypatch.setattr(
         "harshu_ai_os.api.main.answer_with_chroma_rag",
@@ -167,10 +161,10 @@ def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     assert data["metadatas"][0]["position"] == 2
     assert "ChromaDB stores embeddings" in data["context"]
     assert data["citations"] == [
-    {
-        "source": "manual",
-        "chunk_id": "note-2",
-        "chunk_index": None,
-        "distance": 0.2,
-    }
-]
+        {
+            "source": "manual",
+            "chunk_id": "note-2",
+            "chunk_index": None,
+            "distance": 0.2,
+        }
+    ]

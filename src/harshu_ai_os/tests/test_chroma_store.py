@@ -3,14 +3,16 @@ from harshu_ai_os.rag.chroma_store import (
     get_notes_collection,
     query_notes,
     upsert_notes,
-    upsert_chunk_records
+    upsert_chunk_records,
 )
+
 
 def test_get_notes_collection_creates_empty_collection(tmp_path):
     collection = get_notes_collection(tmp_path)
 
     assert collection.name == COLLECTION_NAME
     assert collection.count() == 0
+
 
 class FakeEmbedding:
     def __init__(self, values):
@@ -39,6 +41,7 @@ class FakeClient:
     def __init__(self):
         self.models = FakeModels()
 
+
 def test_upsert_notes_stores_documents_and_metadata(tmp_path):
     collection = get_notes_collection(tmp_path)
     client = FakeClient()
@@ -61,10 +64,8 @@ def test_upsert_notes_stores_documents_and_metadata(tmp_path):
     assert ids == ["note-0", "note-1"]
     assert collection.count() == 2
     assert set(stored["documents"]) == set(notes)
-    assert {
-        metadata["source"]
-        for metadata in stored["metadatas"]
-    } == {"manual"}
+    assert {metadata["source"] for metadata in stored["metadatas"]} == {"manual"}
+
 
 def test_query_notes_returns_closest_note_first(tmp_path):
     collection = get_notes_collection(tmp_path)

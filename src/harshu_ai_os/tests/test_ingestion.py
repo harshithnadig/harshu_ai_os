@@ -1,4 +1,17 @@
-from harshu_ai_os.rag.ingestion import build_chunk_records
+from harshu_ai_os.rag.ingestion import build_chunk_records, chunk_text
+
+
+def test_chunk_text_splits_text_into_word_groups():
+    result = chunk_text(
+        "one two three four five six seven",
+        3,
+    )
+
+    assert result == [
+        "one two three",
+        "four five six",
+        "seven",
+    ]
 
 
 def test_build_chunk_records_adds_source_and_chunk_ids(tmp_path):

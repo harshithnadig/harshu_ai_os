@@ -1,7 +1,10 @@
+"""Persistent Chroma storage and semantic retrieval operations."""
+
 from pathlib import Path
-from harshu_ai_os.rag.retriever import embed_text
 
 import chromadb
+
+from harshu_ai_os.rag.embedding_client import embed_text
 
 
 DEFAULT_CHROMA_PATH = Path("data/chroma")
@@ -9,6 +12,7 @@ COLLECTION_NAME = "harshu_ai_os_notes"
 
 
 def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
+    """Open the one persistent local collection used by the application."""
     client = chromadb.PersistentClient(path=str(path))
 
     return client.get_or_create_collection(
@@ -20,7 +24,9 @@ def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
         },
     )
 
+
 def upsert_notes(collection, client, notes):
+    """Store simple manual notes; retained for the introductory RAG exercise."""
     if not notes:
         raise ValueError("At least one note is required.")
 
@@ -47,7 +53,9 @@ def upsert_notes(collection, client, notes):
 
     return ids
 
+
 def query_notes(collection, client, question):
+    """Embed one question and return its three closest stored text chunks."""
     if not question.strip():
         raise ValueError("Question cannot be empty.")
 
@@ -56,7 +64,7 @@ def query_notes(collection, client, question):
         query_embeddings=[question_embedding],
         n_results=3,
     )
-    
+
     if not results["documents"] or not results["documents"][0]:
         raise ValueError("No matching notes found.")
 
@@ -67,7 +75,9 @@ def query_notes(collection, client, question):
         "metadatas": results["metadatas"][0],
     }
 
+
 def upsert_chunk_records(collection, client, records):
+    """Persist document chunks with the metadata needed for later citations."""
     if not records:
         raise ValueError("At least one chunk record is required.")
 
@@ -84,8 +94,8 @@ def upsert_chunk_records(collection, client, records):
             {
                 "source": record["source"],
                 "chunk_index": record["chunk_index"],
-        }
-    )
+            }
+        )
 
     collection.upsert(
         ids=ids,

@@ -1,3 +1,0 @@
-boot_status=complete
-active_users=2
-maintenance_mode=False
