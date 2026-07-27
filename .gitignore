@@ -24,7 +24,11 @@ dist/
 build/
 
 # IDE & temporary files
-jupyter/
+# Keep old notebook experiments local; track only the curated learning path.
+jupyter/*
+!jupyter/README.md
+!jupyter/learning_path/
+!jupyter/learning_path/**
 revision/
 requirements.txt
 src/harshu_ai_os/kernel/performance_practice.py
