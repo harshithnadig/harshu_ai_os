@@ -9,7 +9,7 @@ from harshu_ai_os.rag.embedding_client import embed_text
 
 DEFAULT_CHROMA_PATH = Path("data/chroma")
 COLLECTION_NAME = "harshu_ai_os_notes"
-
+DEFAULT_TOP_K = 3
 
 def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
     """Open the one persistent local collection used by the application."""
@@ -62,7 +62,7 @@ def query_notes(collection, client, question):
     question_embedding = embed_text(client, question)
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=3,
+        n_results=DEFAULT_TOP_K,
     )
 
     if not results["documents"] or not results["documents"][0]:
