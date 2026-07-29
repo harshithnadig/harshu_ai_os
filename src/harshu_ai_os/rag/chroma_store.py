@@ -9,7 +9,8 @@ from harshu_ai_os.rag.embedding_client import embed_text
 
 DEFAULT_CHROMA_PATH = Path("data/chroma")
 COLLECTION_NAME = "harshu_ai_os_notes"
-DEFAULT_TOP_K = 3
+DEFAULT_TOP_K = 5
+
 
 def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
     """Open the one persistent local collection used by the application."""
