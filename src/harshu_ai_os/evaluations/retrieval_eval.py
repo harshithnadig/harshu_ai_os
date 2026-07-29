@@ -26,8 +26,8 @@ def evaluate_retrieval(evaluation_cases, retrieved_chunks):
 
 
 
-
-print(evaluate_retrieval(evaluation_cases,retrieved_chunks))
+if __name__ == "__main__":
+    print(evaluate_retrieval(evaluation_cases,retrieved_chunks))
 
 
     
