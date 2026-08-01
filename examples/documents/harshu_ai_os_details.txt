@@ -1,0 +1,9 @@
+Harshu AI OS includes an intelligent query router that classifies incoming user prompts into simple, general, or complex categories. Simple queries are routed to fast and lightweight models such as Gemini Flash to minimize latency and cost.
+
+The system features a Retrieval-Augmented Generation (RAG) pipeline. It retrieves top-k relevant document chunks from ChromaDB and passes them as grounded context to the language model to help reduce unsupported answers.
+
+Vector embeddings are generated using embedding models and stored inside persistent ChromaDB collections. The system computes similarity distances to rank retrieved chunks by relevance.
+
+Pydantic schemas validate API request payloads, configuration parameters, and structured evidence outputs across the system.
+
+The retrieval evaluation module tests system performance by comparing retrieved context chunks against ground truth expected answers and calculating overall accuracy.

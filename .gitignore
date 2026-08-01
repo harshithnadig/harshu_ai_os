@@ -33,3 +33,5 @@ revision/
 requirements.txt
 src/harshu_ai_os/kernel/performance_practice.py
 src/harshu_ai_os/kernel/runtime_output.txt
+.kilo/
+.agent_memory/

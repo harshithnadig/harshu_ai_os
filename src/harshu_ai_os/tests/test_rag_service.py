@@ -9,6 +9,9 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from harshu_ai_os.llm.exceptions import LLMServiceError
 
 
+from harshu_ai_os.rag.chroma_store import DEFAULT_TOP_K
+
+
 class FakeEmbedding:
     def __init__(self, values):
         self.values = values
@@ -38,7 +41,7 @@ class FakeClient:
 class FakeCollection:
     def query(self, query_embeddings, n_results):
         assert query_embeddings == [[1.0, 0.0]]
-        assert n_results == 3
+        assert n_results == DEFAULT_TOP_K
 
         return {
             "ids": [["note-1", "note-0"]],
