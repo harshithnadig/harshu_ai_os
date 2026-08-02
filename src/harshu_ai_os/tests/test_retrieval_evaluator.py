@@ -1,4 +1,4 @@
-from harshu_ai_os.evaluations.retrieval_eval import evaluate_retrieval
+from harshu_ai_os.evaluations.retrieval_evaluator import evaluate_retrieval
 
 
 def test_evaluate_retrieval_returns_true_when_expected_text_exists():
