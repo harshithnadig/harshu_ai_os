@@ -99,13 +99,18 @@ def fake_answer_with_chroma_rag(
     embedding_client,
     question,
     route,
+    maximum_distance,
 ):
     assert question == "What does ChromaDB do?"
     assert collection is not None
     assert embedding_client is not None
     assert route["model"] == "gemini/gemini-2.5-flash"
+    assert maximum_distance == 0.5
     return {
         "answer": "ChromaDB retrieves relevant stored notes.",
+        "abstained": False,
+        "abstention_reason": None,
+        "judge_reason": "Context directly supports.",
         "context": "ChromaDB stores embeddings and retrieves notes.",
         "distances": [0.2],
         "ids": ["note-2"],
@@ -168,3 +173,6 @@ def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
             "distance": 0.2,
         }
     ]
+    assert data["abstained"] is False
+    assert data["abstention_reason"] is None
+    assert data["judge_reason"] == "Context directly supports."

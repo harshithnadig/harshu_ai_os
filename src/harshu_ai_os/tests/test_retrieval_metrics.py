@@ -13,21 +13,26 @@ def test_calculate_hit_at_k():
 
 
 def test_calculate_hit_rate():
-    ranks = [1, 2, None, 5]
+    # This is the same small example used in the current learning checkpoint.
+    ranks = [2, None, 4, 1]
 
     result = calculate_hit_rate(ranks, 3)
 
+    # Only ranks 2 and 1 are inside the first three results: 2 / 4 = 50%.
     assert result == 50.0
 
 
 def test_calculate_mrr():
-    ranks = [1, 2, None, 5]
+    ranks = [2, None, 4, 1]
 
     result = calculate_mrr(ranks)
 
-    expected = (1 / 1 + 1 / 2 + 0 + 1 / 5) / 4
+    # Each query contributes 1 / rank; a missing document contributes zero.
+    expected = (1 / 2 + 0 + 1 / 4 + 1 / 1) / 4
 
+    # The worked example must produce the exact MRR learned in the lesson.
     assert result == expected
+    assert result == 0.4375
 
 
 def test_extract_ranks():
