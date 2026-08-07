@@ -2,7 +2,6 @@ from harshu_ai_os.rag.chroma_store import (
     COLLECTION_NAME,
     get_notes_collection,
     query_notes,
-    upsert_notes,
     upsert_chunk_records,
 )
 
@@ -42,41 +41,18 @@ class FakeClient:
         self.models = FakeModels()
 
 
-def test_upsert_notes_stores_documents_and_metadata(tmp_path):
-    collection = get_notes_collection(tmp_path)
-    client = FakeClient()
-
-    notes = [
-        "FastAPI exposes the endpoint.",
-        "The router selects a model.",
-    ]
-
-    ids = upsert_notes(
-        collection,
-        client,
-        notes,
-    )
-
-    stored = collection.get(
-        include=["documents", "metadatas"],
-    )
-
-    assert ids == ["note-0", "note-1"]
-    assert collection.count() == 2
-    assert set(stored["documents"]) == set(notes)
-    assert {metadata["source"] for metadata in stored["metadatas"]} == {"manual"}
-
-
 def test_query_notes_returns_closest_note_first(tmp_path):
     collection = get_notes_collection(tmp_path)
     client = FakeClient()
 
-    notes = [
-        "FastAPI exposes the endpoint.",
-        "The router selects a model.",
-    ]
-
-    upsert_notes(collection, client, notes)
+    upsert_chunk_records(
+        collection,
+        client,
+        [
+            {"id": "note-0", "text": "FastAPI exposes the endpoint.", "source": "notes.txt", "chunk_index": 0},
+            {"id": "note-1", "text": "The router selects a model.", "source": "notes.txt", "chunk_index": 1},
+        ],
+    )
 
     result = query_notes(
         collection,
@@ -86,7 +62,7 @@ def test_query_notes_returns_closest_note_first(tmp_path):
 
     assert result["ids"][0] == "note-1"
     assert result["texts"][0] == "The router selects a model."
-    assert result["metadatas"][0]["position"] == 1
+    assert result["metadatas"][0]["chunk_index"] == 1
     assert result["distances"][0] <= result["distances"][1]
 
 

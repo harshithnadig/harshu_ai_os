@@ -26,35 +26,6 @@ def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
     )
 
 
-def upsert_notes(collection, client, notes):
-    """Store simple manual notes; retained for the introductory RAG exercise."""
-    if not notes:
-        raise ValueError("At least one note is required.")
-
-    ids = []
-    embeddings = []
-    metadatas = []
-
-    for index, note in enumerate(notes):
-        ids.append(f"note-{index}")
-        embeddings.append(embed_text(client, note))
-        metadatas.append(
-            {
-                "source": "manual",
-                "position": index,
-            }
-        )
-
-    collection.upsert(
-        ids=ids,
-        embeddings=embeddings,
-        documents=notes,
-        metadatas=metadatas,
-    )
-
-    return ids
-
-
 def query_notes(collection, client, question):
     """Embed one question and return its three closest stored text chunks."""
     if not question.strip():

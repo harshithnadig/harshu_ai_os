@@ -4,12 +4,7 @@ from harshu_ai_os.rag.chroma_store import query_notes
 from harshu_ai_os.rag.service import should_abstain
 
 
-def evaluate_retrieval(expected, retrieved_chunks):
-    """Returns True if expected text is found in any of the retrieved chunks, else False."""
-    return any(expected in chunk for chunk in retrieved_chunks)
-
-
-def evaluate_retrieval_v2(expected, chunks, metadatas):
+def find_expected_evidence(expected, chunks, metadatas):
     """
     Evaluates the retrieved chunks by finding the exact rank of the expected string.
     Returns a dictionary containing matched status, rank, source metadata, and chunk text.
@@ -77,7 +72,7 @@ def run_retrieval_evaluation(collection, client, evaluation_cases):
         metadatas = retrieved_data["metadatas"]
 
         # 2. Evaluate match by checking if expected text is in retrieved chunks
-        matched = evaluate_retrieval_v2(expected_evidence, chunks, metadatas)
+        matched = find_expected_evidence(expected_evidence, chunks, metadatas)
         if matched["matched"]:
             passed += 1
 
