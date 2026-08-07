@@ -13,6 +13,9 @@ Keep only these files open while learning metrics:
 Everything under `api/`, `llm/`, `rag/`, and `frontend/` already supports the
 application. You do not need to understand those folders during this lesson.
 
+The earlier calculator and Big-O exercises now live only in the numbered Jupyter
+learning notebooks. They are intentionally not part of the AI OS runtime.
+
 ## One mental model
 
 ```text
