@@ -39,3 +39,6 @@ class AskRagResponse(BaseModel):
     ids: list[str]
     metadatas: list[dict[str, Any]]
     citations: list[Citation]
+    abstained: bool = False
+    abstention_reason: str | None = None
+    judge_reason: str | None = None

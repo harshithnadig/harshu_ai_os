@@ -2,6 +2,10 @@
 
 Harshu AI OS is a learning-first AI engineering project with a FastAPI backend and a responsive web interface. It supports direct AI questions and retrieval-augmented generation (RAG) over locally indexed notes.
 
+> **Learning mode:** If you are currently studying RAG evaluation metrics, do
+> not read the entire repository. Start with [`LEARNING_NOW.md`](LEARNING_NOW.md),
+> which limits the checkpoint to three files.
+
 The project demonstrates model routing, embeddings, local vector retrieval, grounded answer generation, and structured citations. LangChain is used only where it adds value to the RAG prompt-model-parser workflow; the direct endpoint remains a small LiteLLM call.
 
 ## Current features
