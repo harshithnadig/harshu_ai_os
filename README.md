@@ -50,10 +50,7 @@ api/main.py
                ├─ rag/ingestion.py
                └─ llm/client.py
 
-kernel/
-├─ runtime.py      # shared configuration, identity, and logging
-├─ cli.py          # optional local interactive entry point
-└─ performance.py  # controlled Python/Big-O learning benchmark
+core.py             # shared configuration and logging
 ```
 
 The ordered learning references are indexed in
@@ -137,7 +134,7 @@ examples/documents/harshu_ai_os_overview.txt
 With `GEMINI_API_KEY` configured, run this command from the repository root:
 
 ```bash
-uv run python scripts/seed_notes.py
+uv run python scripts/ingest_documents.py
 ```
 
 The script splits the example into fixed-size word chunks, generates embeddings, and upserts the chunks into the local Chroma collection. The generated database is stored under `data/chroma/` and is intentionally excluded from Git.

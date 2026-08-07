@@ -11,7 +11,7 @@ from harshu_ai_os.api.schemas import AskRagResponse, AskRequest, AskResponse
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import LLMServiceError
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
-from harshu_ai_os.kernel.runtime import get_logger
+from harshu_ai_os.core import get_logger
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
 from harshu_ai_os.rag.service import (
@@ -20,6 +20,7 @@ from harshu_ai_os.rag.service import (
 )
 
 app = FastAPI()
+logger = get_logger(__name__)
 
 # The standalone Vite client is only used during local development.
 app.add_middleware(
@@ -37,18 +38,17 @@ def health_check():
     return {"status": "healthy"}
 
 
+def choose_request_route(question: str):
+    """Classify one question and return the matching provider route."""
+    classification = classify_task_with_model(question)
+    return classification, choose_route(classification.complexity)
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest):
     """Handle the simple direct-generation path without retrieval machinery."""
-    logger = get_logger(__name__)
     try:
-        classification = classify_task_with_model(request.question)
-
-        logger.info(classification)
-
-        route = choose_route(classification.complexity)
-
-        logger.info(route)
+        classification, route = choose_request_route(request.question)
 
         result = call_llm(route, request.question)
 
@@ -68,11 +68,8 @@ def ask(request: AskRequest):
 @app.post("/ask/rag", response_model=AskRagResponse)
 def ask_rag(request: AskRequest):
     """Handle grounded answers and return the retrieval evidence to the UI."""
-    logger = get_logger(__name__)
-
     try:
-        classification = classify_task_with_model(request.question)
-        route = choose_route(classification.complexity)
+        classification, route = choose_request_route(request.question)
 
         collection = get_notes_collection()
         embedding_client = get_embedding_client()
