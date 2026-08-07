@@ -14,7 +14,10 @@ from harshu_ai_os.llm.router import classify_task_with_model, choose_route
 from harshu_ai_os.kernel.runtime import get_logger
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
-from harshu_ai_os.rag.service import answer_with_chroma_rag
+from harshu_ai_os.rag.service import (
+    DEFAULT_MAXIMUM_DISTANCE,
+    answer_with_chroma_rag,
+)
 
 app = FastAPI()
 
@@ -79,6 +82,7 @@ def ask_rag(request: AskRequest):
             embedding_client,
             request.question,
             route,
+            maximum_distance=DEFAULT_MAXIMUM_DISTANCE,
         )
 
         logger.info(
@@ -96,6 +100,9 @@ def ask_rag(request: AskRequest):
             "ids": result["ids"],
             "metadatas": result["metadatas"],
             "citations": result["citations"],
+            "abstained": result["abstained"],
+            "abstention_reason": result["abstention_reason"],
+            "judge_reason": result.get("judge_reason"),
         }
 
     except LLMServiceError as error:
