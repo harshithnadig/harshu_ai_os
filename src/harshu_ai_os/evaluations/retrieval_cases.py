@@ -1,5 +1,4 @@
-# This file stores our evaluation test cases.
-# We keep them separate so it's easy to add or modify test data without touching the logic.
+"""Synthetic questions and expected evidence used by retrieval evaluations."""
 
 evaluation_cases = [
     # Baseline Supported (5 cases)

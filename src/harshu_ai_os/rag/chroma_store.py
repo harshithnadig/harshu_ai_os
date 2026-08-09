@@ -26,20 +26,23 @@ def get_notes_collection(path: Path = DEFAULT_CHROMA_PATH):
     )
 
 
-def query_notes(collection, client, question):
-    """Embed one question and return its three closest stored text chunks."""
+def query_notes(collection, client, question, top_k: int = DEFAULT_TOP_K):
+    """Embed one question and return its closest stored text chunks."""
     if not question.strip():
         raise ValueError("Question cannot be empty.")
+    if top_k <= 0:
+        raise ValueError("top_k must be greater than 0.")
 
     question_embedding = embed_text(client, question)
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=DEFAULT_TOP_K,
+        n_results=top_k,
     )
 
     if not results["documents"] or not results["documents"][0]:
         raise ValueError("No matching notes found.")
 
+    # Chroma nests results because it can accept several questions at once.
     return {
         "ids": results["ids"][0],
         "texts": results["documents"][0],
