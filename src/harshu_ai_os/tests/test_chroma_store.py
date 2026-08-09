@@ -1,9 +1,16 @@
+import pytest
+
 from harshu_ai_os.rag.chroma_store import (
     COLLECTION_NAME,
     get_notes_collection,
     query_notes,
     upsert_chunk_records,
 )
+
+
+def test_query_notes_rejects_non_positive_top_k():
+    with pytest.raises(ValueError, match="top_k"):
+        query_notes(object(), object(), "valid question", top_k=0)
 
 
 def test_get_notes_collection_creates_empty_collection(tmp_path):
@@ -49,8 +56,18 @@ def test_query_notes_returns_closest_note_first(tmp_path):
         collection,
         client,
         [
-            {"id": "note-0", "text": "FastAPI exposes the endpoint.", "source": "notes.txt", "chunk_index": 0},
-            {"id": "note-1", "text": "The router selects a model.", "source": "notes.txt", "chunk_index": 1},
+            {
+                "id": "note-0",
+                "text": "FastAPI exposes the endpoint.",
+                "source": "notes.txt",
+                "chunk_index": 0,
+            },
+            {
+                "id": "note-1",
+                "text": "The router selects a model.",
+                "source": "notes.txt",
+                "chunk_index": 1,
+            },
         ],
     )
 

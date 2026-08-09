@@ -179,9 +179,7 @@ def answer_with_chroma_rag(
     # Never trust invented chunk IDs returned by a model.
     known_ids = set(retrieval["ids"])
     supporting_ids = [
-        chunk_id
-        for chunk_id in verdict.supporting_chunk_ids
-        if chunk_id in known_ids
+        chunk_id for chunk_id in verdict.supporting_chunk_ids if chunk_id in known_ids
     ]
     verdict_is_valid = (
         not verdict.answerable and not verdict.supporting_chunk_ids

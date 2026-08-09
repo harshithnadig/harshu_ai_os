@@ -1,8 +1,9 @@
 # Learning Now: RAG Evaluation Metrics
 
-This is the only path you need for the current checkpoint.
+This page is your desk. Open one learning lane at a time; the rest of the repo
+can stay closed even though the finished application still uses it.
 
-## The three-file desk
+## Open now: the three-file metrics desk
 
 Keep only these files open while learning metrics:
 
@@ -45,14 +46,35 @@ Run the complete suite only when you are ready to check integration:
 uv run pytest -q
 ```
 
-## Later, not now
+## Open next: optional reranking lab
 
-- Distance thresholds and abstention
-- LLM-based context sufficiency
-- Provider routing and retries
-- FastAPI response schemas
-- Chroma ingestion
-- Frontend rendering
+Reranking is advanced RAG, but its job is simple:
 
-These topics are preserved. They are simply closed until the current metric
-checkpoint is understood.
+```text
+fast search -> possible chunks -> careful second ranking -> better top results
+```
+
+When Hit@k and MRR feel comfortable, open only these files:
+
+1. `rag/reranker.py` — scores and reorders already retrieved candidates.
+2. `tests/test_reranker.py` — proves fields stay attached while order changes.
+3. `evaluations/evaluate_reranker.py` — compares quality and latency.
+
+Small vocabulary:
+
+- **candidate:** a chunk returned by the first search;
+- **CrossEncoder:** a model that reads the question and one chunk together;
+- **rerank:** change candidate order using the new relevance scores;
+- **latency:** how long the extra step takes.
+
+Install this optional lab only when you are ready:
+
+```powershell
+uv sync --extra reranking
+```
+
+## Topic shelf
+
+Distance gates, LLM sufficiency, provider retries, FastAPI schemas, ingestion,
+and frontend rendering are preserved and tested. They are separate future
+lanes—not prerequisites you must hold in your head today.

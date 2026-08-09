@@ -4,7 +4,7 @@ Harshu AI OS is a learning-first AI engineering project with a FastAPI backend a
 
 > **Learning mode:** If you are currently studying RAG evaluation metrics, do
 > not read the entire repository. Start with [`LEARNING_NOW.md`](LEARNING_NOW.md),
-> which limits the checkpoint to three files.
+> which gives you one small reading path at a time.
 
 The project demonstrates model routing, embeddings, local vector retrieval, grounded answer generation, and structured citations. LangChain is used only where it adds value to the RAG prompt-model-parser workflow; the direct endpoint remains a small LiteLLM call.
 
@@ -57,6 +57,38 @@ The ordered learning references are indexed in
 [`jupyter/README.md`](jupyter/README.md). They explain the harder Python,
 routing, reliability, RAG, LangChain, testing, and API-flow concepts using
 synthetic examples and fake model responses.
+
+## How to read this repository
+
+Do not learn every folder at once. Follow one request from left to right:
+
+```text
+API receives question -> service coordinates work -> small helpers do one job
+```
+
+Docstrings explain what a module or function owns. Comments explain decisions
+that are not obvious from the code. Ordinary Python such as appending an item
+is intentionally left uncommented so the important explanations stand out.
+
+## Optional advanced lab: reranking
+
+`rag/reranker.py` contains a second-stage retrieval experiment:
+
+```text
+Chroma finds 10 candidates -> CrossEncoder scores them -> keep the best 5
+```
+
+It is deliberately separate from the live `/ask/rag` path. This lets you learn
+and measure the technique before deciding whether its extra latency is useful.
+Install the optional local model dependency only when you reach that lesson:
+
+```bash
+uv sync --extra reranking
+uv run python -m harshu_ai_os.evaluations.evaluate_reranker
+```
+
+The experiment requires the normal embedding credentials and an already
+ingested local Chroma collection. Its test uses a fake model and needs neither.
 
 ## Prerequisites
 

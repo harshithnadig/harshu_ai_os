@@ -3,6 +3,8 @@
 from dotenv import load_dotenv
 from google import genai
 
+EMBEDDING_MODEL = "gemini-embedding-2"
+
 
 def get_embedding_client():
     """Create the provider client after loading local environment settings."""
@@ -11,9 +13,13 @@ def get_embedding_client():
 
 
 def embed_text(client, text: str) -> list[float]:
-    """Use one embedding model for both stored chunks and incoming questions."""
+    """Turn text into meaning-based numbers used for similarity search.
+
+    Stored chunks and incoming questions must use the same embedding model so
+    that Chroma can compare their vectors correctly.
+    """
     response = client.models.embed_content(
-        model="gemini-embedding-2",
+        model=EMBEDDING_MODEL,
         contents=text,
     )
 

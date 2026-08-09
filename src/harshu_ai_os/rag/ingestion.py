@@ -43,6 +43,7 @@ def build_chunk_records(
     chunks = load_and_chunk_document(path, chunk_size)
     records = []
 
+    # enumerate gives each chunk its position without a manual counter.
     for index, chunk in enumerate(chunks):
         records.append(
             {
@@ -52,6 +53,7 @@ def build_chunk_records(
                 "chunk_index": index,
             }
         )
+
     return records
 
 

@@ -1,41 +1,25 @@
-# This file contains the core logic for running the evaluation against our Retrieval-Augmented Generation (RAG) system.
+"""Run retrieval cases and record where the expected evidence appeared."""
 
 from harshu_ai_os.rag.chroma_store import query_notes
 from harshu_ai_os.rag.service import should_abstain
 
 
 def find_expected_evidence(expected, chunks, metadatas):
-    """
-    Evaluates the retrieved chunks by finding the exact rank of the expected string.
-    Returns a dictionary containing matched status, rank, source metadata, and chunk text.
-    """
-    result = {
-        "matched": False,
-        "rank": None,
-        "source": None,
-        "chunk_text": None,
-    }
-
-    # enumerate(chunks, start=1) starts counting from 1 instead of 0
+    """Return the first 1-based rank containing the expected text."""
     for rank, chunk in enumerate(chunks, start=1):
-
         if expected in chunk:
+            return {
+                "matched": True,
+                "rank": rank,
+                "source": metadatas[rank - 1]["source"],
+                "chunk_text": chunk,
+            }
 
-            result["matched"] = True
-            result["rank"] = rank
-            result["chunk_text"] = chunk
-            result["source"] = metadatas[rank - 1]["source"]
-
-            break
-
-    return result
+    return {"matched": False, "rank": None, "source": None, "chunk_text": None}
 
 
 def run_retrieval_evaluation(collection, client, evaluation_cases):
-    """
-    Runs evaluation for a list of test cases, fetching relevant data from Chroma 
-    and then calculating accuracy. Returns a dictionary with summary and detailed results.
-    """
+    """Retrieve every case and return both detailed results and a summary."""
     passed = 0
     case_results = []
 
@@ -66,17 +50,14 @@ def run_retrieval_evaluation(collection, client, evaluation_cases):
             )
             continue
 
-        # 1. Fetch chunks from Chroma database
         retrieved_data = query_notes(collection, client, question)
         chunks = retrieved_data["texts"]
         metadatas = retrieved_data["metadatas"]
 
-        # 2. Evaluate match by checking if expected text is in retrieved chunks
         matched = find_expected_evidence(expected_evidence, chunks, metadatas)
         if matched["matched"]:
             passed += 1
 
-        # 3. Save result for this particular test case
         case_results.append(
             {
                 "id": case_id,
@@ -90,7 +71,6 @@ def run_retrieval_evaluation(collection, client, evaluation_cases):
             }
         )
 
-    # Calculate overall summary metrics
     total_cases = len(evaluation_cases)
     answerable_cases = sum(1 for case in evaluation_cases if case["answerable"])
     unanswerable_cases = total_cases - answerable_cases
@@ -116,7 +96,7 @@ def evaluate_abstention_thresholds(
     evaluation_cases: list[dict],
     candidate_thresholds: list[float] | None = None,
 ) -> list[dict]:
-    """Sweep candidate distance thresholds against evaluation cases and compute abstention metrics."""
+    """Compare possible distance gates before choosing one for the RAG service."""
     if candidate_thresholds is None:
         candidate_thresholds = [0.15, 0.20, 0.22, 0.24, 0.25, 0.30, 0.50]
 
