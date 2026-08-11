@@ -41,6 +41,7 @@ def test_run_retrieval_evaluation_unsupported_cases_do_not_reduce_accuracy(
     mock_query_notes.return_value = {
         "texts": ["ChromaDB stores document embeddings."],
         "metadatas": [{"source": "overview.txt"}],
+        "ids": ["overview-0"],
     }
 
     evaluation_cases = [
