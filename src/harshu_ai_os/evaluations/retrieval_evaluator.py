@@ -4,14 +4,24 @@ from harshu_ai_os.rag.chroma_store import query_notes
 from harshu_ai_os.rag.service import should_abstain
 
 
-def find_expected_evidence(expected, chunks, metadatas):
-    """Return the first 1-based rank containing the expected text."""
-    for rank, chunk in enumerate(chunks, start=1):
-        if expected in chunk:
+import time
+
+def find_expected_evidence(expected, expected_ids, chunks, metadatas, retrieved_ids):
+    """Return the first 1-based rank containing the expected text or chunk ID."""
+    for rank, (chunk, metadata, chunk_id) in enumerate(zip(chunks, metadatas, retrieved_ids), start=1):
+        if expected_ids:
+            if chunk_id in expected_ids:
+                return {
+                    "matched": True,
+                    "rank": rank,
+                    "source": metadata["source"],
+                    "chunk_text": chunk,
+                }
+        elif expected and expected in chunk:
             return {
                 "matched": True,
                 "rank": rank,
-                "source": metadatas[rank - 1]["source"],
+                "source": metadata["source"],
                 "chunk_text": chunk,
             }
 
@@ -46,28 +56,39 @@ def run_retrieval_evaluation(collection, client, evaluation_cases):
                     "rank": None,
                     "source": None,
                     "chunk_text": None,
+                    "retrieved_ids": [],
+                    "latency": 0.0,
                 }
             )
             continue
 
+        start_time = time.perf_counter()
         retrieved_data = query_notes(collection, client, question)
+        latency = time.perf_counter() - start_time
+        
         chunks = retrieved_data["texts"]
         metadatas = retrieved_data["metadatas"]
+        retrieved_ids = retrieved_data["ids"]
+        expected_ids = case.get("expected_chunk_ids", [])
 
-        matched = find_expected_evidence(expected_evidence, chunks, metadatas)
+        matched = find_expected_evidence(expected_evidence, expected_ids, chunks, metadatas, retrieved_ids)
         if matched["matched"]:
             passed += 1
 
         case_results.append(
             {
                 "id": case_id,
+                "category": case.get("category", "unknown"),
                 "question": question,
                 "answerable": True,
                 "expected_evidence": expected_evidence,
+                "expected_chunk_ids": expected_ids,
                 "evaluation": matched,
                 "rank": matched["rank"],
                 "source": matched["source"],
                 "chunk_text": matched["chunk_text"],
+                "retrieved_ids": retrieved_ids,
+                "latency": latency,
             }
         )
 

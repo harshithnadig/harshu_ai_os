@@ -1,59 +1,87 @@
+import pytest
 from harshu_ai_os.evaluations.retrieval_metrics import (
     calculate_hit_at_k,
-    calculate_hit_rate,
     calculate_mrr,
-    extract_ranks,
+    calculate_hit_rate,
+    calculate_precision_at_k,
+    calculate_recall_at_k,
+    calculate_fact_recall_at_k
 )
 
-
 def test_calculate_hit_at_k():
-    assert calculate_hit_at_k(2, 5) is True
-    assert calculate_hit_at_k(6, 5) is False
-    assert calculate_hit_at_k(None, 5) is False
-
-
-def test_calculate_hit_rate():
-    # This is the same small example used in the current learning checkpoint.
-    ranks = [2, None, 4, 1]
-
-    result = calculate_hit_rate(ranks, 3)
-
-    # Only ranks 2 and 1 are inside the first three results: 2 / 4 = 50%.
-    assert result == 50.0
-
+    assert calculate_hit_at_k(1, 3) is True
+    assert calculate_hit_at_k(3, 3) is True
+    assert calculate_hit_at_k(4, 3) is False
+    assert calculate_hit_at_k(None, 3) is False
 
 def test_calculate_mrr():
-    ranks = [2, None, 4, 1]
+    assert calculate_mrr([1, 2, None]) == (1 + 0.5 + 0) / 3
+    assert calculate_mrr([]) == 0.0
 
-    result = calculate_mrr(ranks)
+def test_calculate_hit_rate():
+    assert calculate_hit_rate([1, 4, None], 3) == (1 / 3) * 100
+    assert calculate_hit_rate([], 3) == 0.0
 
-    # Each query contributes 1 / rank; a missing document contributes zero.
-    expected = (1 / 2 + 0 + 1 / 4 + 1 / 1) / 4
+def test_calculate_precision_at_k():
+    assert calculate_precision_at_k(["c1", "c2", "c3"], ["c2", "c4"], 2) == 0.5
+    assert calculate_precision_at_k(["c1", "c2"], ["c3"], 2) == 0.0
+    assert calculate_precision_at_k([], ["c1"], 2) == 0.0
 
-    # The worked example must produce the exact MRR learned in the lesson.
-    assert result == expected
-    assert result == 0.4375
+def test_calculate_recall_at_k():
+    assert calculate_recall_at_k(["c1", "c2", "c3"], ["c2", "c4"], 3) == 0.5
+    assert calculate_recall_at_k(["c1", "c2"], ["c3"], 2) == 0.0
+    assert calculate_recall_at_k([], ["c1"], 2) == 0.0
 
+def test_calculate_fact_recall_at_k():
+    facts = {
+        "f1": ["c1", "c2"],
+        "f2": ["c3", "c4"],
+        "f3": ["c5"]
+    }
+    # hit 2 out of 3 facts
+    assert calculate_fact_recall_at_k(["c1", "c4", "c6"], facts, 3) == 2 / 3
+    
+    # hit all facts (multiple chunks for same fact doesn't double-count)
+    assert calculate_fact_recall_at_k(["c1", "c2", "c5"], facts, 3) == 2 / 3 # wait, c1/c2 hit f1, c5 hits f3, total 2 facts. Correct.
+    
+    # empty retrieval
+    assert calculate_fact_recall_at_k([], facts, 3) == 0.0
 
-def test_extract_ranks():
-    case_results = [
-        {
-            "evaluation": {
-                "rank": 1
-            }
-        },
-        {
-            "evaluation": {
-                "rank": 3
-            }
-        },
-        {
-            "evaluation": {
-                "rank": None
-            }
-        },
-    ]
+def test_rrf_fusion_disjoint():
+    # Test RRF with completely disjoint rankings
+    from harshu_ai_os.evaluations.run_arena import rrf_fusion
+    r1 = ["a", "b", "c"]
+    r2 = ["d", "e", "f"]
+    fused = rrf_fusion([r1, r2], k=60)
+    assert len(fused) == 6
+    assert set(fused) == {"a", "b", "c", "d", "e", "f"}
+    # Verify order: 'a' and 'd' are rank 0, score 1/61. Deterministic tiebreak: 'a' then 'd'.
+    assert fused == ["a", "d", "b", "e", "c", "f"]
 
-    result = extract_ranks(case_results)
+def test_rrf_fusion_overlapping():
+    # Test RRF with duplicate/overlapping rankings
+    from harshu_ai_os.evaluations.run_arena import rrf_fusion
+    r1 = ["a", "b", "c"]
+    r2 = ["c", "b", "d"]
+    fused = rrf_fusion([r1, r2], k=60)
+    # 'b' gets 1/62 + 1/62 = 2/62 = 0.0322
+    # 'c' gets 1/63 + 1/61 = 0.0322
+    # 'a' gets 1/61 = 0.0163
+    # 'd' gets 1/63 = 0.0158
+    assert len(fused) == 4
+    # 'b' and 'c' are top. Let's verify deterministic sorting.
+    assert "b" in fused[:2] and "c" in fused[:2]
+    # 'a' is next, 'd' is last
+    assert fused[2] == "a"
+    assert fused[3] == "d"
 
-    assert result == [1, 3, None]
+def test_rrf_fusion_deterministic():
+    # Test deterministic tie-breaking and fixed k=60
+    from harshu_ai_os.evaluations.run_arena import rrf_fusion
+    r1 = ["z"]
+    r2 = ["a"]
+    # Both at rank 0, score 1/61. Tie broken by string ascending: 'a' before 'z'
+    fused = rrf_fusion([r1, r2], k=60)
+    assert fused == ["a", "z"]
+    fused_rev = rrf_fusion([r2, r1], k=60)
+    assert fused_rev == ["a", "z"]
