@@ -11,6 +11,7 @@ from harshu_ai_os.api.schemas import AskRagResponse, AskRequest, AskResponse
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import LLMServiceError
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
+from harshu_ai_os.llm.tools import AVAILABLE_TOOLS, WEB_SEARCH_TOOL_SCHEMA
 from harshu_ai_os.core import get_logger
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
@@ -46,17 +47,38 @@ def choose_request_route(question: str):
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest):
-    """Handle the simple direct-generation path without retrieval machinery."""
+    """Handle the direct-generation path with optional single-round tool calling."""
     try:
         classification, route = choose_request_route(request.question)
 
-        result = call_llm(route, request.question)
+        result = call_llm(
+            route,
+            request.question,
+            tools=[WEB_SEARCH_TOOL_SCHEMA],
+            available_tools=AVAILABLE_TOOLS,
+            return_tool_info=True,
+        )
 
         logger.info("model=%s", route["model"])
+        if isinstance(result, dict):
+            return {
+                "complexity": classification.complexity,
+                "answer": result.get("answer", ""),
+                "model": route["model"],
+                "tool_used": result.get("tool_used", False),
+                "tool_name": result.get("tool_name"),
+                "tool_query": result.get("tool_query"),
+                "tool_sources": result.get("tool_sources", []),
+            }
+
         return {
             "complexity": classification.complexity,
-            "answer": result,
+            "answer": str(result),
             "model": route["model"],
+            "tool_used": False,
+            "tool_name": None,
+            "tool_query": None,
+            "tool_sources": [],
         }
     except LLMServiceError as error:
         logger.error(error)
@@ -100,6 +122,10 @@ def ask_rag(request: AskRequest):
             "abstained": result["abstained"],
             "abstention_reason": result["abstention_reason"],
             "judge_reason": result.get("judge_reason"),
+            "retrieval_ms": result.get("retrieval_ms", 0.0),
+            "judge_ms": result.get("judge_ms", 0.0),
+            "generation_ms": result.get("generation_ms", 0.0),
+            "total_ms": result.get("total_ms", 0.0),
         }
 
     except LLMServiceError as error:
