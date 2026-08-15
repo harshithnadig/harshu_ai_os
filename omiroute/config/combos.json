@@ -1,0 +1,68 @@
+{
+  "combos": [
+    {
+      "name": "harshu-classifier",
+      "strategy": "fill-first",
+      "models": [
+        "groq/openai/gpt-oss-20b",
+        "gemini/gemini-2.5-flash-lite",
+        "gemini/gemini-2.5-flash"
+      ],
+      "cooldownMs": 60000,
+      "maxRetries": 3
+    },
+    {
+      "name": "harshu-judge",
+      "strategy": "fill-first",
+      "models": [
+        "groq/openai/gpt-oss-120b",
+        "groq/openai/gpt-oss-20b",
+        "gemini/gemini-2.5-flash"
+      ],
+      "cooldownMs": 60000,
+      "maxRetries": 3
+    },
+    {
+      "name": "harshu-general",
+      "strategy": "fill-first",
+      "models": [
+        "groq/openai/gpt-oss-20b",
+        "gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash-lite"
+      ],
+      "cooldownMs": 60000,
+      "maxRetries": 3
+    },
+    {
+      "name": "harshu-reasoning",
+      "strategy": "priority",
+      "models": [
+        "groq/openai/gpt-oss-120b",
+        "gemini/gemini-2.5-flash",
+        "groq/openai/gpt-oss-20b"
+      ],
+      "cooldownMs": 60000,
+      "maxRetries": 3
+    },
+    {
+      "name": "harshu-tools",
+      "strategy": "fill-first",
+      "models": [
+        "groq/openai/gpt-oss-20b",
+        "gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash-lite"
+      ],
+      "cooldownMs": 60000,
+      "maxRetries": 3
+    },
+    {
+      "name": "harshu-embedding",
+      "strategy": "priority",
+      "models": [
+        "gemini/gemini-embedding-2"
+      ],
+      "cooldownMs": 0,
+      "maxRetries": 1
+    }
+  ]
+}

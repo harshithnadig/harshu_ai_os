@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Harshu AI OS Logical Model Roles and OmniRoute Gateway Routing Mappings",
+  "version": "1.2.0",
+  "roles": {
+    "harshu-classifier": {
+      "purpose": "Classify incoming user questions into simple/general/complex and detect tool/information needs.",
+      "combo_name": "harshu-classifier",
+      "strategy": "fill-first",
+      "models": [
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-20b",
+          "tier": "primary",
+          "notes": "Ultra-fast low-latency verified structured JSON classifier"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash-lite",
+          "tier": "fallback_1",
+          "notes": "Low-latency fallback classifier"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash",
+          "tier": "fallback_2",
+          "notes": "High-context multimodal fallback"
+        }
+      ],
+      "requirements": {
+        "structured_json": true,
+        "low_latency": true,
+        "max_output_tokens": 1000
+      }
+    },
+    "harshu-judge": {
+      "purpose": "Evaluate whether retrieved RAG candidate chunks are sufficient to answer the question.",
+      "combo_name": "harshu-judge",
+      "strategy": "fill-first",
+      "models": [
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-120b",
+          "tier": "primary",
+          "notes": "High-capacity reasoning evaluation for structured sufficiency verdicts"
+        },
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-20b",
+          "tier": "fallback_1",
+          "notes": "Fast deterministic evaluation backup"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash",
+          "tier": "fallback_2",
+          "notes": "High-context fallback tier"
+        }
+      ],
+      "requirements": {
+        "structured_json": true,
+        "deterministic": true,
+        "required_keys": ["answerable", "reason", "supporting_chunk_ids"]
+      }
+    },
+    "harshu-general": {
+      "purpose": "Generate general, high-quality conversational responses and direct answers.",
+      "combo_name": "harshu-general",
+      "strategy": "fill-first",
+      "models": [
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-20b",
+          "tier": "primary",
+          "notes": "High-speed conversational open-weight model"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash",
+          "tier": "fallback_1",
+          "notes": "Well-balanced quality and latency backup"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash-lite",
+          "tier": "fallback_2",
+          "notes": "Concise direct-answer fallback"
+        }
+      ],
+      "requirements": {
+        "high_quality_text": true,
+        "max_output_tokens": 500
+      }
+    },
+    "harshu-reasoning": {
+      "purpose": "Perform deep reasoning, complex logic analysis, and architectural evaluation.",
+      "combo_name": "harshu-reasoning",
+      "strategy": "priority",
+      "models": [
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-120b",
+          "tier": "primary",
+          "notes": "Top-tier high-capacity open reasoning model"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash",
+          "tier": "fallback_1",
+          "notes": "High-context reasoning fallback"
+        },
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-20b",
+          "tier": "fallback_2",
+          "notes": "Fast reasoning fallback"
+        }
+      ],
+      "requirements": {
+        "reasoning_capability": true,
+        "max_output_tokens": 2000
+      }
+    },
+    "harshu-tools": {
+      "purpose": "Allow the model to intelligently decide whether to call functions such as web_search.",
+      "combo_name": "harshu-tools",
+      "strategy": "fill-first",
+      "models": [
+        {
+          "provider": "groq",
+          "model": "groq/openai/gpt-oss-20b",
+          "tier": "primary",
+          "supports_tools": true,
+          "notes": "Live tested and verified native function calling"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash",
+          "tier": "fallback_1",
+          "supports_tools": true,
+          "notes": "Live tested and verified native tool calling support"
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-2.5-flash-lite",
+          "tier": "fallback_2",
+          "supports_tools": true,
+          "notes": "Live tested and verified native tool calling support"
+        }
+      ],
+      "requirements": {
+        "strict_tool_calling_support": true,
+        "preserve_tool_schema": true,
+        "preserve_tool_call_id": true
+      }
+    },
+    "harshu-embedding": {
+      "purpose": "Generate numerical vector embeddings matching Harshu AI OS ChromaDB collections.",
+      "combo_name": "harshu-embedding",
+      "strategy": "priority",
+      "maxRetries": 1,
+      "models": [
+        {
+          "provider": "gemini",
+          "model": "gemini/gemini-embedding-2",
+          "dimension": 3072,
+          "tier": "primary",
+          "notes": "Exact match for Harshu AI OS embedding_client.py (gemini-embedding-2, 3072-dim)"
+        }
+      ],
+      "fallback_policy": "NO_CROSS_MODEL_FALLBACK",
+      "fallback_rationale": "Vector embeddings across different model architectures or dimensions cannot be co-indexed within the same ChromaDB collection without destroying cosine distance geometry. Automatic failover to a different embedding model is strictly prohibited to preserve retrieval correctness. Changing embedding models requires intentional Chroma re-indexing."
+    }
+  }
+}
