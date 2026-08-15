@@ -28,10 +28,11 @@
         <div class="hero-content">
           <p class="eyebrow"><span></span> YOUR INTELLIGENCE, AMPLIFIED</p>
           <h1 id="page-title">Think beyond<br /><span>the obvious.</span></h1>
-          <p class="hero-copy">One intelligent workspace for fast answers and grounded insight from the knowledge you trust.</p>
+          <p class="hero-copy">One intelligent workspace for fast answers, live web tool execution, and grounded insight from your trusted knowledge.</p>
           <div class="capabilities" aria-label="Capabilities">
             <span><i>01</i> Adaptive routing</span>
-            <span><i>02</i> Source-aware RAG</span>
+            <span><i>02</i> Web search tool</span>
+            <span><i>03</i> Source-aware RAG</span>
           </div>
         </div>
 
@@ -43,7 +44,7 @@
           <div class="intelligence-core">
             <div class="core-surface"><span>✦</span></div>
           </div>
-          <div class="signal signal-one"><span>NORMAL</span><strong>Direct intelligence</strong></div>
+          <div class="signal signal-one"><span>NORMAL</span><strong>Direct & Tool Intelligence</strong></div>
           <div class="signal signal-two"><span>RAG</span><strong>Grounded in context</strong></div>
           <div class="visual-caption"><i></i> HARSHU CORE / ACTIVE</div>
         </div>
@@ -57,7 +58,7 @@
           </div>
           <div class="mode-switch" role="radiogroup" aria-label="Answer mode">
             <button class="mode-button active" type="button" role="radio" aria-checked="true" data-mode="ask">
-              <span class="mode-icon">✦</span><span><strong>Normal</strong><small>Direct answer</small></span>
+              <span class="mode-icon">✦</span><span><strong>Normal</strong><small>Direct / Web Search</small></span>
             </button>
             <button class="mode-button" type="button" role="radio" aria-checked="false" data-mode="rag">
               <span class="mode-icon">⌘</span><span><strong>RAG</strong><small>Grounded answer</small></span>
@@ -69,7 +70,7 @@
           <label class="sr-only" for="question">Your question</label>
           <textarea id="question" name="question" rows="3" maxlength="8000" placeholder="Ask anything. Go as deep as you like..." required></textarea>
           <div class="form-footer">
-            <span id="mode-hint"><i></i> Direct AI response</span>
+            <span id="mode-hint"><i></i> Direct AI response with automatic web search if needed</span>
             <button id="submit-button" class="submit-button" type="submit"><span>Ask Harshu</span><b aria-hidden="true">↗</b></button>
           </div>
         </form>
@@ -81,12 +82,88 @@
           <div id="metadata" class="metadata"></div>
         </div>
         <div id="answer" class="answer"></div>
+
+        <!-- Normal Mode: Web Search Tool Execution -->
+        <div id="tool-execution" class="tool-execution" hidden>
+          <div class="section-heading">
+            <h2>Web Search Tool</h2>
+            <span id="tool-status-tag" class="status-tag">Executed</span>
+          </div>
+          <div class="tool-query-box">
+            <span class="tool-label">Search Query</span>
+            <code id="tool-query"></code>
+          </div>
+          <div class="sources-container">
+            <h3 class="subsection-title">Web Sources</h3>
+            <div id="tool-sources" class="web-sources-list"></div>
+          </div>
+        </div>
+
+        <!-- RAG Mode: Grounding, Timings, Citations, & Debug Details -->
         <div id="rag-evidence" hidden>
-          <div class="citations-heading"><h2>Sources</h2><span>Retrieved evidence</span></div>
-          <div id="citations" class="citation-list"></div>
-          <details id="context-details">
-            <summary>View retrieved evidence</summary>
-            <pre id="context"></pre>
+          <div id="rag-status-banner" class="rag-status-banner"></div>
+
+          <div class="timing-section">
+            <div class="section-heading">
+              <h2>Execution Timings</h2>
+              <span>RAG pipeline latency</span>
+            </div>
+            <div class="timing-grid">
+              <div class="timing-card">
+                <span class="timing-label">Retrieval</span>
+                <strong id="time-retrieval">—</strong>
+              </div>
+              <div class="timing-card">
+                <span class="timing-label">Judge</span>
+                <strong id="time-judge">—</strong>
+              </div>
+              <div class="timing-card">
+                <span class="timing-label">Generation</span>
+                <strong id="time-generation">—</strong>
+              </div>
+              <div class="timing-card total">
+                <span class="timing-label">Total</span>
+                <strong id="time-total">—</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="citations-section">
+            <div class="citations-heading">
+              <h2>Supporting Sources</h2>
+              <span id="citations-count">Retrieved evidence</span>
+            </div>
+            <div id="citations" class="citation-list"></div>
+          </div>
+
+          <details id="rag-debug-details" class="debug-details">
+            <summary>Execution & Debug Details</summary>
+            <div class="debug-content">
+              <div class="debug-field">
+                <strong>Sufficiency Judge Reason:</strong>
+                <p id="rag-judge-reason"></p>
+              </div>
+              <div class="debug-field">
+                <strong>Retrieved Chunks Count:</strong>
+                <span id="rag-chunk-count">0</span>
+              </div>
+              <div class="debug-field">
+                <strong>Chunk IDs:</strong>
+                <code id="rag-ids"></code>
+              </div>
+              <div class="debug-field">
+                <strong>Cosine Distances:</strong>
+                <code id="rag-distances"></code>
+              </div>
+              <div class="debug-field">
+                <strong>Chunk Metadata:</strong>
+                <pre id="rag-metadata"></pre>
+              </div>
+              <div class="debug-field">
+                <strong>Retrieved Context:</strong>
+                <pre id="context"></pre>
+              </div>
+            </div>
           </details>
         </div>
       </section>

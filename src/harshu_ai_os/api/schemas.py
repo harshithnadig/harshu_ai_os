@@ -11,12 +11,23 @@ class AskRequest(BaseModel):
     question: str
 
 
+class WebSource(BaseModel):
+    """A web reference returned by search tools."""
+
+    title: str
+    url: str
+
+
 class AskResponse(BaseModel):
-    """Response for a direct model answer."""
+    """Response for a direct model answer, including any tool execution details."""
 
     answer: str
     complexity: str
     model: str
+    tool_used: bool = False
+    tool_name: str | None = None
+    tool_query: str | None = None
+    tool_sources: list[WebSource] = []
 
 
 class Citation(BaseModel):
@@ -42,3 +53,7 @@ class AskRagResponse(BaseModel):
     abstained: bool = False
     abstention_reason: str | None = None
     judge_reason: str | None = None
+    retrieval_ms: float = 0.0
+    judge_ms: float = 0.0
+    generation_ms: float = 0.0
+    total_ms: float = 0.0
