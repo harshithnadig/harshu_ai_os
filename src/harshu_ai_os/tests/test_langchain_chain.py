@@ -2,7 +2,6 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
 from harshu_ai_os.llm.client import (
     create_chat_model_from_route,
-    to_langchain_identifier,
 )
 from harshu_ai_os.rag.service import (
     create_grounded_chat_prompt,
@@ -10,76 +9,31 @@ from harshu_ai_os.rag.service import (
 )
 
 
-def test_langchain_identifier_preserves_provider_model_paths() -> None:
+def test_chat_model_factory_preserves_route_controls() -> None:
     route = {
-        "model": "groq/openai/gpt-oss-20b",
-        "max_tokens": 1000,
-    }
-
-    assert to_langchain_identifier(route) == "groq:openai/gpt-oss-20b"
-
-
-def test_chat_model_factory_preserves_route_controls(monkeypatch) -> None:
-    captured = {}
-
-    def fake_init_chat_model(identifier, **options):
-        captured["identifier"] = identifier
-        captured["options"] = options
-        return object()
-
-    monkeypatch.setattr(
-        "harshu_ai_os.llm.client.init_chat_model",
-        fake_init_chat_model,
-    )
-
-    route = {
-        "model": "gemini/gemini-2.5-flash",
+        "model": "openai/harshu-general",
         "max_tokens": 500,
-        "thinking": {
-            "type": "disabled",
-            "budget_tokens": 0,
-        },
     }
 
     model = create_chat_model_from_route(route)
 
     assert model is not None
-    assert captured == {
-        "identifier": "google_genai:gemini-2.5-flash",
-        "options": {
-            "temperature": 0,
-            "max_tokens": 500,
-            "timeout": 30,
-            "max_retries": 3,
-            "thinking_budget": 0,
-        },
-    }
+    assert model.model_name == "harshu-general"
+    assert model.max_tokens == 500
+    assert "http" in model.base_url
 
 
-def test_chat_model_factory_preserves_reasoning_effort(monkeypatch) -> None:
-    captured = {}
-
-    def fake_init_chat_model(identifier, **options):
-        captured["identifier"] = identifier
-        captured["options"] = options
-        return object()
-
-    monkeypatch.setattr(
-        "harshu_ai_os.llm.client.init_chat_model",
-        fake_init_chat_model,
-    )
-
-    create_chat_model_from_route(
+def test_chat_model_factory_handles_logical_roles() -> None:
+    model = create_chat_model_from_route(
         {
-            "model": "groq/openai/gpt-oss-20b",
-            "max_tokens": 1000,
-            "reasoning_effort": "medium",
+            "model": "openai/harshu-reasoning",
+            "max_tokens": 2000,
         }
     )
 
-    assert captured["identifier"] == "groq:openai/gpt-oss-20b"
-    assert captured["options"]["reasoning_effort"] == "medium"
-    assert captured["options"]["max_retries"] == 3
+    assert model.model_name == "harshu-reasoning"
+    assert model.max_tokens == 2000
+
 
 
 def test_grounded_text_chain_returns_text() -> None:

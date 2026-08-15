@@ -61,7 +61,8 @@ def judge_context_sufficiency(
             f'<chunk id="{cid}">\n{txt}\n</chunk>'
             for cid, txt in zip(chunk_ids, chunks)
         )
-        model = create_chat_model_from_route(route)
+        judge_route = {"model": "openai/harshu-judge", "max_tokens": 1000}
+        model = create_chat_model_from_route(judge_route)
         structured_model = model.with_structured_output(SufficiencyVerdict)
         prompt = create_sufficiency_judge_prompt()
         prompt_value = prompt.invoke(
