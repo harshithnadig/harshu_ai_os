@@ -1,22 +1,24 @@
 """Classify each request and select a logical model route."""
 
-from dotenv import load_dotenv
-from litellm import completion
+import re
 from typing import Literal
 
+from dotenv import load_dotenv
+from litellm import completion
 from pydantic import BaseModel
 
+from harshu_ai_os.core import get_omniroute_config
 from harshu_ai_os.llm.client import build_messages
 
-
-# The classifier uses a direct LiteLLM call because it is intentionally small
-# and does not need RAG prompt composition.
 load_dotenv()
 
-SIMPLE_MODEL = "groq/llama-3.1-8b-instant"
-GENERAL_MODEL = "gemini/gemini-2.5-flash"
-REASONING_MODEL = "groq/openai/gpt-oss-20b"
-CLASSIFIER_MODEL = "gemini/gemini-2.5-flash"
+# OmniRoute logical roles
+SIMPLE_MODEL = "openai/harshu-general"
+GENERAL_MODEL = "openai/harshu-general"
+REASONING_MODEL = "openai/harshu-reasoning"
+CLASSIFIER_MODEL = "openai/harshu-classifier"
+TOOLS_MODEL = "openai/harshu-tools"
+JUDGE_MODEL = "openai/harshu-judge"
 
 
 class TaskClassification(BaseModel):
@@ -56,43 +58,44 @@ def classify_task_with_model(user_prompt: str) -> TaskClassification:
         user_prompt,
     )
 
+    base_url, api_key = get_omniroute_config()
     response = completion(
         model=CLASSIFIER_MODEL,
+        api_base=base_url,
+        api_key=api_key,
         messages=messages,
-        max_completion_tokens=100,
-        reasoning_effort="none",
+        max_tokens=1000,
         temperature=0.0,
         timeout=30,
     )
 
-    raw_result = response.choices[0].message.content
+    raw_result = (response.choices[0].message.content or "").strip()
+    json_match = re.search(r"\{.*\}", raw_result, re.DOTALL)
+    if json_match:
+        raw_result = json_match.group(0)
 
     return TaskClassification.model_validate_json(raw_result)
 
 
 def choose_route(task_type: str) -> dict:
-    """Map a logical complexity level to provider and generation controls."""
+    """Map a logical complexity level to OmniRoute logical role and token controls."""
     if task_type == "simple":
         return {
             "model": SIMPLE_MODEL,
-            "max_tokens": 80,
+            "max_tokens": 150,
         }
 
     if task_type == "general":
         return {
             "model": GENERAL_MODEL,
             "max_tokens": 500,
-            "thinking": {
-                "type": "disabled",
-                "budget_tokens": 0,
-            },
         }
 
     if task_type == "complex":
         return {
             "model": REASONING_MODEL,
-            "max_tokens": 1000,
-            "reasoning_effort": "medium",
+            "max_tokens": 2000,
         }
 
     raise ValueError(f"Unknown task type: {task_type}")
+
