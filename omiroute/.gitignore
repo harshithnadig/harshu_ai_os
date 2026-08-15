@@ -1,0 +1,24 @@
+# Local environment files (contains real API keys)
+.env
+.env.local
+*.local
+
+# Node.js dependencies and caches
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OmniRoute runtime storage and databases
+data/
+*.sqlite
+*.sqlite3
+*.db
+storage/
+logs/
+.omniroute/
+
+# Python test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

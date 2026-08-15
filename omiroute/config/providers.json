@@ -1,0 +1,49 @@
+{
+  "providers": [
+    {
+      "id": "groq",
+      "name": "Groq Cloud",
+      "env_var": "GROQ_API_KEY",
+      "type": "official_api",
+      "base_url": "https://api.groq.com/openai/v1",
+      "supports_tools": true,
+      "supports_chat": true,
+      "supports_embeddings": false,
+      "tos_safe": true
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "env_var": "GEMINI_API_KEY",
+      "type": "official_api",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "supports_tools": true,
+      "supports_chat": true,
+      "supports_embeddings": true,
+      "tos_safe": true
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras Inference",
+      "env_var": "CEREBRAS_API_KEY",
+      "type": "official_api",
+      "base_url": "https://api.cerebras.ai/v1",
+      "supports_tools": true,
+      "supports_chat": true,
+      "supports_embeddings": false,
+      "tos_safe": true
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere AI",
+      "env_var": "COHERE_API_KEY",
+      "type": "official_api",
+      "base_url": "https://api.cohere.com/v2",
+      "supports_tools": true,
+      "supports_chat": true,
+      "supports_embeddings": true,
+      "embedding_dimension": 1024,
+      "tos_safe": true
+    }
+  ]
+}
