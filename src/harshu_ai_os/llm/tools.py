@@ -27,7 +27,8 @@ def web_search(query: str, max_results: int = 3) -> dict:
             title = item.get("title", "")
             body = item.get("body", "")
             url = item.get("href") or item.get("url") or ""
-            snippets.append(f"[{i}] {title}: {body}")
+            source_label = f" (Source: {url})" if url else ""
+            snippets.append(f"[{i}] {title}{source_label}: {body}")
             if url:
                 sources.append({"title": title, "url": url})
 
