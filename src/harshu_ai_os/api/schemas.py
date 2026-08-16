@@ -57,3 +57,17 @@ class AskRagResponse(BaseModel):
     judge_ms: float = 0.0
     generation_ms: float = 0.0
     total_ms: float = 0.0
+
+
+class AskAgentResponse(BaseModel):
+    """Response for a bounded ReAct multi-step agent query."""
+
+    answer: str
+    complexity: str
+    model: str
+    steps_taken: int
+    tool_calls_count: int
+    tool_sources: list[WebSource] = []
+    stopped_reason: str
+    tool_used: bool = False
+
