@@ -39,3 +39,4 @@ gpu_scripts/
 models/
 omiroute/upstream/
 omiroute/.env
+.run/
