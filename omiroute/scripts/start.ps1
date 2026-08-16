@@ -16,17 +16,21 @@ if ($Existing) {
     exit 0
 }
 
-# Ensure environment variables are loaded if .env exists in omiroute/
-$EnvPath = Join-Path $PSScriptRoot "..\.env"
-if (Test-Path $EnvPath) {
-    Write-Host "[INFO] Loading environment variables from omiroute/.env..." -ForegroundColor Yellow
-    Get-Content $EnvPath | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
-            $parts = $line.Split("=", 2)
-            $varName = $parts[0].Trim()
-            $varVal = $parts[1].Trim()
-            [System.Environment]::SetEnvironmentVariable($varName, $varVal, [System.EnvironmentVariableTarget]::Process)
+# Ensure environment variables are loaded from root .env and omiroute/.env
+$RootEnv = Join-Path $PSScriptRoot "..\..\.env"
+$SubsystemEnv = Join-Path $PSScriptRoot "..\.env"
+
+foreach ($envFile in @($RootEnv, $SubsystemEnv)) {
+    if (Test-Path $envFile) {
+        Write-Host "[INFO] Loading environment variables from $envFile..." -ForegroundColor Yellow
+        Get-Content $envFile | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                $parts = $line.Split("=", 2)
+                $varName = $parts[0].Trim()
+                $varVal = $parts[1].Trim().Trim('"').Trim("'")
+                [System.Environment]::SetEnvironmentVariable($varName, $varVal, [System.EnvironmentVariableTarget]::Process)
+            }
         }
     }
 }
