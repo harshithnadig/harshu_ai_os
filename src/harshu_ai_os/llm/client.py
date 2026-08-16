@@ -42,8 +42,18 @@ def make_llm_call(completion_args: dict):
 
 SYSTEM_PROMPT = (
     "You are the Harshu AI OS runtime assistant. "
-    "Answer clearly and concisely. Unless the user asks for detail, "
+    "Answer clearly, accurately, and concisely. Unless the user asks for detail, "
     "keep the response under 150 words."
+)
+
+TOOL_SYNTHESIS_SYSTEM_PROMPT = (
+    "You are the Harshu AI OS runtime assistant.\n"
+    "CRITICAL GROUNDING RULES FOR SYNTHESIS:\n"
+    "1. Base your answer strictly on facts present in the provided tool observations.\n"
+    "2. Do NOT invent, extrapolate, or hallucinate version numbers, dates, statistics, or names absent from those observations.\n"
+    "3. When sources conflict, prioritize authoritative primary/official sources (e.g., official project domains or official documentation) over third-party blogs or aggregators.\n"
+    "4. If reliable returned sources genuinely conflict and cannot be resolved, explicitly state the discrepancy rather than choosing an unsupported value.\n"
+    "5. Keep the answer concise, accurate, and under 150 words."
 )
 
 
@@ -149,11 +159,18 @@ def call_llm(
                     }
                 )
 
-            # Second call to get the final answer using tool output.
-            # Ensure sufficient token budget to summarize the tool response.
+            # Second call to get the final grounded answer using tool output.
+            # Enforce the rigorous tool synthesis grounding contract.
+            if messages and isinstance(messages[0], dict) and messages[0].get("role") == "system":
+                messages[0]["content"] = TOOL_SYNTHESIS_SYSTEM_PROMPT
+
             completion_args["messages"] = messages
-            if completion_args.get("max_completion_tokens", 0) < 400:
-                completion_args["max_completion_tokens"] = 400
+            if "tools" in completion_args:
+                del completion_args["tools"]
+            if "tool_choice" in completion_args:
+                del completion_args["tool_choice"]
+            if completion_args.get("max_completion_tokens", 0) < 600:
+                completion_args["max_completion_tokens"] = 600
 
             final_response = make_llm_call(completion_args)
             final_answer = final_response.choices[0].message.content or ""
