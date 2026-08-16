@@ -3,112 +3,203 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#090b14" />
-    <meta name="description" content="A focused interface for Harshu AI OS." />
-    <title>Harshu AI OS</title>
+    <meta name="theme-color" content="#06080e" />
+    <meta name="description" content="Harshu AI OS — Neural Mission Control for Precision Intelligence." />
+    <title>Harshu AI OS — Neural Mission Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div class="ambient ambient-one" aria-hidden="true"></div>
-    <div class="ambient ambient-two" aria-hidden="true"></div>
-    <div class="page-grid" aria-hidden="true"></div>
+    <!-- Background Ambient & Precision Grid (GPU-Optimized Static Layers) -->
+    <div class="ambient-glow" aria-hidden="true"></div>
+    <div class="precision-grid" aria-hidden="true"></div>
 
     <main class="app-shell">
-      <header class="site-header">
-        <a class="brand" href="/" aria-label="Harshu AI OS home">
-          <span class="brand-mark" aria-hidden="true">✦</span>
-          <span>HARSHU <em>AI OS</em></span>
-        </a>
-        <div class="header-meta">
-          <span class="edition">PERSONAL INTELLIGENCE</span>
-          <span class="status"><i></i> SYSTEM ONLINE</span>
+      <!-- 1. Header Deck -->
+      <header class="header-deck" role="banner">
+        <div class="brand-group">
+          <div class="brand-gem" aria-hidden="true">✦</div>
+          <div class="brand-titles">
+            <span class="brand-title">HARSHU <em>AI OS</em></span>
+            <span class="brand-subtitle">NEURAL MISSION CONTROL</span>
+          </div>
+        </div>
+
+        <div class="header-controls">
+          <div class="status-pill" aria-label="System status">
+            <span class="status-dot"></span>
+            <span>OMNIROUTE ONLINE</span>
+          </div>
+          <button id="inspector-toggle-btn" class="inspector-btn" type="button" aria-controls="inspector-drawer" aria-expanded="false" title="Toggle Intelligence Inspector">
+            <span class="btn-icon">⚡</span>
+            <span>INSPECTOR</span>
+            <kbd>⌥I</kbd>
+          </button>
         </div>
       </header>
 
-      <section class="hero" aria-labelledby="page-title">
+      <!-- 2. Hero Section: Intelligence Operating System + Orbital Radar -->
+      <section class="hero-stage" aria-labelledby="hero-title">
         <div class="hero-content">
-          <p class="eyebrow"><span></span> YOUR INTELLIGENCE, AMPLIFIED</p>
-          <h1 id="page-title">Think beyond<br /><span>the obvious.</span></h1>
-          <p class="hero-copy">One intelligent workspace for fast answers, live web tool execution, and grounded insight from your trusted knowledge.</p>
-          <div class="capabilities" aria-label="Capabilities">
-            <span><i>01</i> Adaptive routing</span>
-            <span><i>02</i> Web search tool</span>
-            <span><i>03</i> Source-aware RAG</span>
+          <p class="eyebrow"><span class="eyebrow-dot"></span> INTELLIGENCE OPERATING SYSTEM</p>
+          <h1 id="hero-title">
+            Operate intelligence<br />
+            <span class="gradient-headline">with total clarity.</span>
+          </h1>
+          <p class="hero-description">
+            Direct language synthesis, verified live web tool execution, and source-grounded RAG coordinated through logical OmniRoute architecture.
+          </p>
+          <div class="feature-capsules" aria-label="Core Capabilities">
+            <div class="capsule"><i>01</i><span>Direct LLM</span></div>
+            <div class="capsule"><i>02</i><span>Web Search Tool</span></div>
+            <div class="capsule"><i>03</i><span>Grounded RAG</span></div>
           </div>
         </div>
 
-        <div class="intelligence-visual" aria-hidden="true">
-          <div class="visual-halo"></div>
-          <div class="orbit orbit-outer"><i></i><i></i></div>
-          <div class="orbit orbit-mid"><i></i></div>
-          <div class="orbit orbit-inner"></div>
-          <div class="intelligence-core">
-            <div class="core-surface"><span>✦</span></div>
+        <!-- Orbital Intelligence Radar Graphic -->
+        <div class="radar-container" aria-hidden="true">
+          <div class="radar-glow"></div>
+          <div class="orbit orbit-outer">
+            <span class="node node-cyan node-1"></span>
+            <span class="node node-ice node-2"></span>
           </div>
-          <div class="signal signal-one"><span>NORMAL</span><strong>Direct & Tool Intelligence</strong></div>
-          <div class="signal signal-two"><span>RAG</span><strong>Grounded in context</strong></div>
-          <div class="visual-caption"><i></i> HARSHU CORE / ACTIVE</div>
+          <div class="orbit orbit-mid">
+            <span class="node node-emerald node-3"></span>
+          </div>
+          <div class="orbit orbit-inner"></div>
+          
+          <div class="core-container">
+            <div class="core-monolith">
+              <span class="core-glyph">✦</span>
+            </div>
+          </div>
+
+          <!-- Floating Orbit Telemetry Chips -->
+          <div class="floating-chip chip-routing">
+            <span class="chip-kicker">ROUTING</span>
+            <strong id="live-route-node">harshu-general</strong>
+          </div>
+          <div class="floating-chip chip-verification">
+            <span class="chip-kicker">VERIFICATION</span>
+            <strong>Source Grounding</strong>
+          </div>
         </div>
       </section>
 
-      <section class="ask-card" aria-label="Ask Harshu AI OS">
-        <div class="composer-header">
-          <div>
-            <span class="composer-kicker">NEW THOUGHT</span>
-            <strong>What’s on your mind?</strong>
+      <!-- 3. Glass Command Surface Card (Composer) -->
+      <section class="command-surface-card" aria-label="Command Surface">
+        <div class="surface-header">
+          <div class="surface-title-group">
+            <span class="surface-led"></span>
+            <span class="surface-title">COMMAND SURFACE</span>
           </div>
-          <div class="mode-switch" role="radiogroup" aria-label="Answer mode">
-            <button class="mode-button active" type="button" role="radio" aria-checked="true" data-mode="ask">
-              <span class="mode-icon">✦</span><span><strong>Normal</strong><small>Direct / Web Search</small></span>
+
+          <div class="mode-switch" role="radiogroup" aria-label="Intelligence execution mode">
+            <button class="mode-btn active" type="button" role="radio" aria-checked="true" data-mode="ask" id="mode-btn-normal">
+              <span class="mode-glyph">✦</span>
+              <div class="mode-info">
+                <strong>Normal</strong>
+                <small>Direct / Web Tools</small>
+              </div>
             </button>
-            <button class="mode-button" type="button" role="radio" aria-checked="false" data-mode="rag">
-              <span class="mode-icon">⌘</span><span><strong>RAG</strong><small>Grounded answer</small></span>
+
+            <button class="mode-btn" type="button" role="radio" aria-checked="false" data-mode="rag" id="mode-btn-rag">
+              <span class="mode-glyph">⌘</span>
+              <div class="mode-info">
+                <strong>RAG</strong>
+                <small>Grounded Knowledge</small>
+              </div>
+            </button>
+
+            <button class="mode-btn disabled" type="button" role="radio" aria-checked="false" disabled title="Autonomous Agent execution (coming soon)">
+              <span class="mode-glyph">⌖</span>
+              <div class="mode-info">
+                <strong>Agent</strong>
+                <small>Reserved</small>
+              </div>
             </button>
           </div>
         </div>
 
-        <form id="ask-form">
-          <label class="sr-only" for="question">Your question</label>
-          <textarea id="question" name="question" rows="3" maxlength="8000" placeholder="Ask anything. Go as deep as you like..." required></textarea>
-          <div class="form-footer">
-            <span id="mode-hint"><i></i> Direct AI response with automatic web search if needed</span>
-            <button id="submit-button" class="submit-button" type="submit"><span>Ask Harshu</span><b aria-hidden="true">↗</b></button>
+        <form id="ask-form" class="composer-form">
+          <label class="sr-only" for="question">Your prompt or knowledge inquiry</label>
+          <div class="input-shell">
+            <span class="prompt-carat" aria-hidden="true">❯</span>
+            <textarea
+              id="question"
+              name="question"
+              rows="3"
+              maxlength="8000"
+              placeholder="Enter instruction, knowledge query, or tool request..."
+              required
+            ></textarea>
+          </div>
+
+          <div class="surface-footer">
+            <div class="telemetry-bar">
+              <span class="telemetry-item">ROUTE: <strong id="route-indicator">AUTO-CLASSIFY</strong></span>
+              <span class="telemetry-sep">/</span>
+              <span class="telemetry-item">GATEWAY: <strong>OMNIROUTE</strong></span>
+              <span class="telemetry-sep">/</span>
+              <span class="telemetry-item" id="mode-indicator">MODE: NORMAL DIRECT</span>
+            </div>
+
+            <div class="action-cluster">
+              <span class="focus-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> to focus</span>
+              <button id="submit-button" class="execute-btn" type="submit">
+                <span>Execute</span>
+                <span class="btn-arrow" aria-hidden="true">→</span>
+              </button>
+            </div>
           </div>
         </form>
       </section>
 
-      <section id="result" class="result" aria-live="polite" hidden>
-        <div class="result-header">
-          <p class="eyebrow result-label" id="result-label"><span></span> RESPONSE</p>
-          <div id="metadata" class="metadata"></div>
+      <!-- 4. Result Surface (Rendered on Request) -->
+      <section id="result" class="result-surface-card" aria-live="polite" hidden>
+        <div class="result-top">
+          <div class="result-heading-group">
+            <span class="result-led"></span>
+            <span class="result-heading">RESPONSE</span>
+          </div>
+          <div id="metadata" class="metadata-cluster"></div>
         </div>
-        <div id="answer" class="answer"></div>
 
-        <!-- Normal Mode: Web Search Tool Execution -->
-        <div id="tool-execution" class="tool-execution" hidden>
-          <div class="section-heading">
-            <h2>Web Search Tool</h2>
-            <span id="tool-status-tag" class="status-tag">Executed</span>
+        <div id="answer" class="answer-content"></div>
+
+        <!-- Normal Mode: Web Search Tool Card -->
+        <div id="tool-execution" class="tool-deck" hidden>
+          <div class="tool-deck-header">
+            <div class="tool-deck-title">
+              <span class="tool-icon">⚡</span>
+              <h2>Web Search Tool</h2>
+            </div>
+            <span id="tool-status-tag" class="tool-badge">Executed</span>
           </div>
           <div class="tool-query-box">
-            <span class="tool-label">Search Query</span>
+            <span class="tool-kicker">Search Query</span>
             <code id="tool-query"></code>
           </div>
-          <div class="sources-container">
-            <h3 class="subsection-title">Web Sources</h3>
-            <div id="tool-sources" class="web-sources-list"></div>
+          <div class="tool-sources-wrapper">
+            <h3 class="sources-subtitle">Web Sources</h3>
+            <div id="tool-sources" class="web-sources-grid"></div>
           </div>
         </div>
 
-        <!-- RAG Mode: Grounding, Timings, Citations, & Debug Details -->
-        <div id="rag-evidence" hidden>
-          <div id="rag-status-banner" class="rag-status-banner"></div>
+        <!-- RAG Mode: Grounding Banner, Latency Timings, Citations, Debug Drawer -->
+        <div id="rag-evidence" class="rag-deck" hidden>
+          <!-- Grounding Decision Banner -->
+          <div id="rag-status-banner" class="grounding-banner"></div>
 
-          <div class="timing-section">
-            <div class="section-heading">
+          <!-- Pipeline Latency Timings -->
+          <div class="timings-wrapper">
+            <div class="timings-header">
               <h2>Execution Timings</h2>
-              <span>RAG pipeline latency</span>
+              <span>RAG pipeline latency breakdown</span>
             </div>
-            <div class="timing-grid">
+            <div class="timings-grid">
               <div class="timing-card">
                 <span class="timing-label">Retrieval</span>
                 <strong id="time-retrieval">—</strong>
@@ -121,46 +212,48 @@
                 <span class="timing-label">Generation</span>
                 <strong id="time-generation">—</strong>
               </div>
-              <div class="timing-card total">
+              <div class="timing-card timing-total">
                 <span class="timing-label">Total</span>
                 <strong id="time-total">—</strong>
               </div>
             </div>
           </div>
 
-          <div class="citations-section">
-            <div class="citations-heading">
+          <!-- Citations & Verified Evidence -->
+          <div class="citations-wrapper">
+            <div class="citations-header">
               <h2>Supporting Sources</h2>
               <span id="citations-count">Retrieved evidence</span>
             </div>
-            <div id="citations" class="citation-list"></div>
+            <div id="citations" class="citations-grid"></div>
           </div>
 
-          <details id="rag-debug-details" class="debug-details">
+          <!-- Expandable Execution & Debug Details -->
+          <details id="rag-debug-details" class="debug-drawer">
             <summary>Execution & Debug Details</summary>
-            <div class="debug-content">
-              <div class="debug-field">
-                <strong>Sufficiency Judge Reason:</strong>
+            <div class="debug-pane">
+              <div class="debug-row">
+                <span class="debug-label">Sufficiency Judge Reason:</span>
                 <p id="rag-judge-reason"></p>
               </div>
-              <div class="debug-field">
-                <strong>Retrieved Chunks Count:</strong>
-                <span id="rag-chunk-count">0</span>
+              <div class="debug-row">
+                <span class="debug-label">Retrieved Chunks Count:</span>
+                <span id="rag-chunk-count" class="debug-value">0</span>
               </div>
-              <div class="debug-field">
-                <strong>Chunk IDs:</strong>
+              <div class="debug-row">
+                <span class="debug-label">Chunk IDs:</span>
                 <code id="rag-ids"></code>
               </div>
-              <div class="debug-field">
-                <strong>Cosine Distances:</strong>
+              <div class="debug-row">
+                <span class="debug-label">Cosine Distances:</span>
                 <code id="rag-distances"></code>
               </div>
-              <div class="debug-field">
-                <strong>Chunk Metadata:</strong>
+              <div class="debug-row">
+                <span class="debug-label">Chunk Metadata:</span>
                 <pre id="rag-metadata"></pre>
               </div>
-              <div class="debug-field">
-                <strong>Retrieved Context:</strong>
+              <div class="debug-row">
+                <span class="debug-label">Retrieved Context:</span>
                 <pre id="context"></pre>
               </div>
             </div>
@@ -168,16 +261,85 @@
         </div>
       </section>
 
-      <section id="error" class="error-panel" role="alert" hidden>
-        <span aria-hidden="true">!</span>
-        <div><strong>We couldn’t complete that request.</strong><p id="error-message"></p></div>
+      <!-- 5. Error Surface -->
+      <section id="error" class="error-surface-card" role="alert" hidden>
+        <span class="error-badge">!</span>
+        <div class="error-details">
+          <strong>Request Incomplete</strong>
+          <p id="error-message"></p>
+        </div>
       </section>
 
-      <footer>
-        <span>DESIGNED FOR DEEPER THINKING</span>
+      <!-- 6. Footer -->
+      <footer class="system-footer">
+        <span>DESIGNED FOR PRECISION THINKING</span>
         <span>HARSHU AI OS · 2026</span>
       </footer>
     </main>
+
+    <!-- 7. Inspector Slide-Over Drawer -->
+    <aside id="inspector-drawer" class="inspector-drawer" aria-hidden="true">
+      <div class="inspector-backdrop" id="inspector-backdrop"></div>
+      <div class="inspector-panel">
+        <div class="inspector-header">
+          <div class="inspector-title-group">
+            <span class="inspector-icon">⚡</span>
+            <h3>Intelligence Inspector</h3>
+          </div>
+          <button id="inspector-close-btn" class="inspector-close-btn" type="button" aria-label="Close Inspector">✕</button>
+        </div>
+        <div class="inspector-body">
+          <div class="inspector-section">
+            <h4>Gateway Status</h4>
+            <div class="inspector-row">
+              <span>OmniRoute Multi-Provider</span>
+              <span class="inspector-tag-green">Online</span>
+            </div>
+            <div class="inspector-row">
+              <span>Active Fast Model</span>
+              <span class="inspector-code">gemini-2.5-flash</span>
+            </div>
+            <div class="inspector-row">
+              <span>Active Reasoning Model</span>
+              <span class="inspector-code">deepseek-reasoner</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Vector Knowledge Store</h4>
+            <div class="inspector-row">
+              <span>ChromaDB Store</span>
+              <span class="inspector-tag-green">Connected</span>
+            </div>
+            <div class="inspector-row">
+              <span>Embedding Engine</span>
+              <span class="inspector-code">text-embedding-3-small</span>
+            </div>
+            <div class="inspector-row">
+              <span>Sufficiency Threshold</span>
+              <span class="inspector-code">0.72 Cosine</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Tools & Verification</h4>
+            <div class="inspector-row">
+              <span>DuckDuckGo Web Search</span>
+              <span class="inspector-tag-green">Armed</span>
+            </div>
+            <div class="inspector-row">
+              <span>Sufficiency Judge</span>
+              <span class="inspector-tag-green">Active</span>
+            </div>
+            <div class="inspector-row">
+              <span>Autonomous Agents</span>
+              <span class="inspector-tag-muted">Standby</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
