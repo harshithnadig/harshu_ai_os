@@ -31,17 +31,18 @@ if (Test-Path $EnvPath) {
     }
 }
 
-$LocalMjs = Join-Path $PSScriptRoot "..\upstream\OmniRoute\bin\omniroute.mjs"
+$UpstreamDir = Join-Path $PSScriptRoot "..\upstream\OmniRoute"
+$RunNextMjs = Join-Path $UpstreamDir "scripts\dev\run-next.mjs"
 
-if (Test-Path $LocalMjs) {
-    Write-Host "[EXEC] Starting via local upstream distribution..." -ForegroundColor Green
-    Start-Process -FilePath "node" -ArgumentList "`"$LocalMjs`" serve --port $Port --no-open" -NoNewWindow
+if (Test-Path $RunNextMjs) {
+    Write-Host "[EXEC] Starting via local upstream distribution (run-next.mjs)..." -ForegroundColor Green
+    Start-Process -FilePath "node" -ArgumentList "`"$RunNextMjs`" dev --port $Port" -WorkingDirectory $UpstreamDir -NoNewWindow
 } elseif (Get-Command "omniroute" -ErrorAction SilentlyContinue) {
     Write-Host "[EXEC] Starting via global omniroute binary..." -ForegroundColor Green
     Start-Process -FilePath "omniroute" -ArgumentList "serve --port $Port --no-open" -NoNewWindow
 } elseif (Get-Command "npx" -ErrorAction SilentlyContinue) {
     Write-Host "[EXEC] Starting via npx omniroute..." -ForegroundColor Green
-    Start-Process -FilePath "npx" -ArgumentList "-y omniroute@3.8.49 serve --port $Port --no-open" -NoNewWindow
+    Start-Process -FilePath "npx.cmd" -ArgumentList "-y omniroute@3.8.49 serve --port $Port --no-open" -NoNewWindow
 } else {
     Write-Error "[ERROR] Neither local omniroute distribution nor node was found. Please install Node.js."
     exit 1
