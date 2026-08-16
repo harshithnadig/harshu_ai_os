@@ -7,7 +7,13 @@ retrieval and provider details remain in their owning modules.
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from harshu_ai_os.api.schemas import AskRagResponse, AskRequest, AskResponse
+from harshu_ai_os.agents.loop import run_agent_loop
+from harshu_ai_os.api.schemas import (
+    AskAgentResponse,
+    AskRagResponse,
+    AskRequest,
+    AskResponse,
+)
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import LLMServiceError
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
@@ -138,3 +144,41 @@ def ask_rag(request: AskRequest):
         # Retrieval validation errors are caused by the request or local index,
         # not an unavailable model provider.
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/ask/agent", response_model=AskAgentResponse)
+def ask_agent(request: AskRequest):
+    """Handle bounded ReAct multi-step agent queries."""
+    try:
+        classification, route = choose_request_route(request.question)
+
+        result = run_agent_loop(
+            route=route,
+            user_prompt=request.question,
+            tools=[WEB_SEARCH_TOOL_SCHEMA],
+            available_tools=AVAILABLE_TOOLS,
+        )
+
+        logger.info(
+            "agent_model=%s steps=%s",
+            route["model"],
+            result.get("steps_taken", 0),
+        )
+
+        return {
+            "answer": result.get("answer", ""),
+            "complexity": classification.complexity,
+            "model": route["model"],
+            "steps_taken": result.get("steps_taken", 0),
+            "tool_calls_count": result.get("tool_calls_count", 0),
+            "tool_sources": result.get("tool_sources", []),
+            "stopped_reason": result.get("stopped_reason", "completed"),
+            "tool_used": result.get("tool_used", False),
+        }
+    except LLMServiceError as error:
+        logger.error(error)
+        raise HTTPException(
+            status_code=503,
+            detail="AI service temporarily unavailable",
+        )
+

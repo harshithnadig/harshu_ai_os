@@ -216,3 +216,127 @@ def test_ask_rag_endpoint_returns_grounded_response(monkeypatch):
     assert data["judge_ms"] == 45.0
     assert data["generation_ms"] == 80.2
     assert data["total_ms"] == 137.7
+
+
+def test_ask_agent_endpoint_success(monkeypatch):
+    def fake_run_agent_loop(route: dict, user_prompt: str, tools: list, available_tools: dict, **kwargs):
+        assert route["model"] == "openai/harshu-general"
+        assert user_prompt == "What is Python 3.14?"
+        assert len(tools) == 1
+        return {
+            "answer": "Python 3.14 was released with template strings and performance updates.",
+            "steps_taken": 2,
+            "tool_calls_count": 2,
+            "tool_sources": [
+                {"title": "Python 3.14 Docs", "url": "https://docs.python.org/3.14"},
+                {"title": "Python Releases", "url": "https://python.org/downloads"},
+            ],
+            "stopped_reason": "completed",
+            "tool_used": True,
+        }
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.classify_task_with_model",
+        fake_classify_task,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.run_agent_loop",
+        fake_run_agent_loop,
+    )
+
+    response = client.post(
+        "/ask/agent",
+        json={"question": "What is Python 3.14?"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] == "Python 3.14 was released with template strings and performance updates."
+    assert data["complexity"] == "general"
+    assert data["model"] == "openai/harshu-general"
+    assert data["steps_taken"] == 2
+    assert data["tool_calls_count"] == 2
+    assert data["stopped_reason"] == "completed"
+    assert data["tool_used"] is True
+    assert data["tool_sources"] == [
+        {"title": "Python 3.14 Docs", "url": "https://docs.python.org/3.14"},
+        {"title": "Python Releases", "url": "https://python.org/downloads"},
+    ]
+
+
+def test_ask_agent_endpoint_direct_answer(monkeypatch):
+    def fake_run_agent_loop_direct(route: dict, user_prompt: str, tools: list, available_tools: dict, **kwargs):
+        return {
+            "answer": "Paris is the capital of France.",
+            "steps_taken": 0,
+            "tool_calls_count": 0,
+            "tool_sources": [],
+            "stopped_reason": "direct_answer",
+            "tool_used": False,
+        }
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.classify_task_with_model",
+        fake_classify_task,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.run_agent_loop",
+        fake_run_agent_loop_direct,
+    )
+
+    response = client.post(
+        "/ask/agent",
+        json={"question": "What is the capital of France?"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] == "Paris is the capital of France."
+    assert data["complexity"] == "general"
+    assert data["model"] == "openai/harshu-general"
+    assert data["steps_taken"] == 0
+    assert data["tool_calls_count"] == 0
+    assert data["stopped_reason"] == "direct_answer"
+    assert data["tool_used"] is False
+    assert data["tool_sources"] == []
+
+
+def test_ask_agent_endpoint_llm_failure(monkeypatch):
+    def fake_run_agent_loop_fail(route: dict, user_prompt: str, tools: list, available_tools: dict, **kwargs):
+        raise LLMServiceError("agent provider unavailable")
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.classify_task_with_model",
+        fake_classify_task,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.run_agent_loop",
+        fake_run_agent_loop_fail,
+    )
+
+    response = client.post(
+        "/ask/agent",
+        json={"question": "What is Python 3.14?"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "AI service temporarily unavailable"
+
+
+def test_ask_agent_endpoint_classifier_failure(monkeypatch):
+    def fake_classify_fail(question: str):
+        raise LLMServiceError("classifier service down")
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.classify_task_with_model",
+        fake_classify_fail,
+    )
+
+    response = client.post(
+        "/ask/agent",
+        json={"question": "What is Python 3.14?"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "AI service temporarily unavailable"
+
