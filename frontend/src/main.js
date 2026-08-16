@@ -1,82 +1,138 @@
-import "./styles.css";
+// Harshu AI OS — Neural Mission Control Frontend Runtime
+const API_BASE_URL = "http://127.0.0.1:8000";
 
-// The frontend stays deliberately thin: the backend owns routing, retrieval,
-// provider calls, and tool dispatch; this file renders their typed response.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-const modeDescriptions = {
-  ask: "Direct AI response with automatic web search tool if required",
-  rag: "Retrieves indexed knowledge notes, checks sufficiency, and grounds answer",
-};
+const form = document.getElementById("ask-form");
+const question = document.getElementById("question");
+const submitButton = document.getElementById("submit-button");
+const modeButtons = document.querySelectorAll(".mode-btn:not(.disabled)");
+const modeIndicator = document.getElementById("mode-indicator");
+const routeIndicator = document.getElementById("route-indicator");
+const liveRouteNode = document.getElementById("live-route-node");
 
-const form = document.querySelector("#ask-form");
-const question = document.querySelector("#question");
-const submitButton = document.querySelector("#submit-button");
-const modeButtons = document.querySelectorAll(".mode-button");
-const modeHint = document.querySelector("#mode-hint");
-const result = document.querySelector("#result");
-const answer = document.querySelector("#answer");
-const metadata = document.querySelector("#metadata");
+const result = document.getElementById("result");
+const answer = document.getElementById("answer");
+const metadata = document.getElementById("metadata");
+const errorPanel = document.getElementById("error");
+const errorMessage = document.getElementById("error-message");
 
-// Tool Execution Elements (Normal Mode)
-const toolExecution = document.querySelector("#tool-execution");
-const toolQuery = document.querySelector("#tool-query");
-const toolSources = document.querySelector("#tool-sources");
+// Normal Mode: Web Search Tool Elements
+const toolExecution = document.getElementById("tool-execution");
+const toolQuery = document.getElementById("tool-query");
+const toolSources = document.getElementById("tool-sources");
 
-// RAG Elements
-const ragEvidence = document.querySelector("#rag-evidence");
-const ragStatusBanner = document.querySelector("#rag-status-banner");
-const timeRetrieval = document.querySelector("#time-retrieval");
-const timeJudge = document.querySelector("#time-judge");
-const timeGeneration = document.querySelector("#time-generation");
-const timeTotal = document.querySelector("#time-total");
-const citations = document.querySelector("#citations");
-const ragJudgeReason = document.querySelector("#rag-judge-reason");
-const ragChunkCount = document.querySelector("#rag-chunk-count");
-const ragIds = document.querySelector("#rag-ids");
-const ragDistances = document.querySelector("#rag-distances");
-const ragMetadata = document.querySelector("#rag-metadata");
-const context = document.querySelector("#context");
+// RAG Mode Elements
+const ragEvidence = document.getElementById("rag-evidence");
+const ragStatusBanner = document.getElementById("rag-status-banner");
+const timeRetrieval = document.getElementById("time-retrieval");
+const timeJudge = document.getElementById("time-judge");
+const timeGeneration = document.getElementById("time-generation");
+const timeTotal = document.getElementById("time-total");
+const citations = document.getElementById("citations");
+const ragJudgeReason = document.getElementById("rag-judge-reason");
+const ragChunkCount = document.getElementById("rag-chunk-count");
+const ragIds = document.getElementById("rag-ids");
+const ragDistances = document.getElementById("rag-distances");
+const ragMetadata = document.getElementById("rag-metadata");
+const context = document.getElementById("context");
 
-const errorPanel = document.querySelector("#error");
-const errorMessage = document.querySelector("#error-message");
+// Inspector Drawer Elements
+const inspectorDrawer = document.getElementById("inspector-drawer");
+const inspectorToggleBtn = document.getElementById("inspector-toggle-btn");
+const inspectorCloseBtn = document.getElementById("inspector-close-btn");
+const inspectorBackdrop = document.getElementById("inspector-backdrop");
 
 let activeMode = "ask";
 let latestRequestId = 0;
 
-modeButtons.forEach((button) => {
-  button.addEventListener("click", () => setMode(button.dataset.mode));
+// Mode Descriptions
+const modeLabels = {
+  ask: "MODE: NORMAL DIRECT",
+  rag: "MODE: GROUNDED RAG",
+};
+
+// Mode Switcher Handlers
+modeButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setMode(btn.dataset.mode);
+  });
 });
 
 function setMode(mode) {
+  if (!mode || mode === activeMode) return;
   activeMode = mode;
-  modeButtons.forEach((button) => {
-    const selected = button.dataset.mode === mode;
-    button.classList.toggle("active", selected);
-    button.setAttribute("aria-checked", String(selected));
+
+  modeButtons.forEach((btn) => {
+    const isSelected = btn.dataset.mode === mode;
+    btn.classList.toggle("active", isSelected);
+    btn.setAttribute("aria-checked", String(isSelected));
   });
-  modeHint.textContent = modeDescriptions[mode];
+
+  if (modeIndicator) {
+    modeIndicator.textContent = modeLabels[mode] || "MODE: UNKNOWN";
+  }
+
+  if (liveRouteNode) {
+    liveRouteNode.textContent = mode === "rag" ? "rag-pipeline" : "harshu-general";
+  }
 }
+
+// Inspector Drawer Handlers
+function toggleInspector(show) {
+  const isOpen = typeof show === "boolean" ? show : !inspectorDrawer.classList.contains("open");
+  inspectorDrawer.classList.toggle("open", isOpen);
+  inspectorDrawer.setAttribute("aria-hidden", String(!isOpen));
+  if (inspectorToggleBtn) {
+    inspectorToggleBtn.setAttribute("aria-expanded", String(isOpen));
+  }
+}
+
+if (inspectorToggleBtn) {
+  inspectorToggleBtn.addEventListener("click", () => toggleInspector());
+}
+if (inspectorCloseBtn) {
+  inspectorCloseBtn.addEventListener("click", () => toggleInspector(false));
+}
+if (inspectorBackdrop) {
+  inspectorBackdrop.addEventListener("click", () => toggleInspector(false));
+}
+
+// Global Keyboard Shortcuts (⌥I for Inspector, Ctrl+K for Search Focus)
+window.addEventListener("keydown", (e) => {
+  if (e.altKey && (e.key === "i" || e.key === "I" || e.code === "KeyI")) {
+    e.preventDefault();
+    toggleInspector();
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+    e.preventDefault();
+    question.focus();
+  }
+  if (e.key === "Escape" && inspectorDrawer.classList.contains("open")) {
+    toggleInspector(false);
+  }
+});
 
 function setLoading(isLoading) {
   submitButton.disabled = isLoading;
   question.disabled = isLoading;
-  modeButtons.forEach((button) => {
-    button.disabled = isLoading;
+  modeButtons.forEach((btn) => {
+    btn.disabled = isLoading;
   });
+
   submitButton.innerHTML = isLoading
-    ? '<span class="spinner" aria-hidden="true"></span><span>Thinking</span>'
-    : '<span>Ask Harshu</span><b aria-hidden="true">↗</b>';
+    ? '<span class="spinner" aria-hidden="true"></span><span>Thinking...</span>'
+    : '<span>Execute</span><span class="btn-arrow" aria-hidden="true">→</span>';
 }
 
 function clearOutput() {
   result.hidden = true;
   clearError();
+
   toolExecution.hidden = true;
   toolSources.replaceChildren();
   toolQuery.textContent = "";
 
   ragEvidence.hidden = true;
-  ragStatusBanner.className = "rag-status-banner";
+  ragStatusBanner.className = "grounding-banner";
   ragStatusBanner.replaceChildren();
   citations.replaceChildren();
   context.textContent = "";
@@ -91,77 +147,85 @@ function clearError() {
   errorMessage.textContent = "";
 }
 
-function addMeta(label, value) {
+function addMeta(label, value, fragment) {
   const chip = document.createElement("span");
+  chip.className = "meta-chip";
   chip.textContent = `${label}: ${value}`;
-  metadata.append(chip);
+  if (fragment) {
+    fragment.appendChild(chip);
+  } else {
+    metadata.append(chip);
+  }
 }
 
-function renderWebSource(source, index) {
-  // Use safe DOM methods for untrusted live web search data.
-  const item = document.createElement("div");
-  item.className = "web-source-item";
+function renderWebSource(source, index, fragment) {
+  const row = document.createElement("div");
+  row.className = "web-source-row";
 
   const num = document.createElement("span");
-  num.className = "source-index";
+  num.className = "source-num";
   num.textContent = `${index + 1}.`;
 
-  const link = document.createElement("a");
-  link.className = "web-source-link";
-  link.textContent = source.title || source.url || "Web Source";
-  link.href = source.url || "#";
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
+  const anchor = document.createElement("a");
+  anchor.className = "source-anchor";
+  anchor.textContent = source.title || source.url || "External Web Source";
+  anchor.href = source.url || "#";
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
 
-  const urlPreview = document.createElement("span");
-  urlPreview.className = "source-url-preview";
+  const host = document.createElement("span");
+  host.className = "source-host";
   try {
     const parsed = new URL(source.url);
-    urlPreview.textContent = parsed.hostname;
+    host.textContent = parsed.hostname.replace(/^www\./, "");
   } catch {
-    urlPreview.textContent = source.url;
+    host.textContent = source.url || "";
   }
 
-  item.append(num, link, urlPreview);
-  toolSources.append(item);
+  row.append(num, anchor, host);
+  fragment.appendChild(row);
 }
 
-function renderCitation(citation, index) {
-  // Use textContent instead of HTML interpolation for retrieved document data.
-  const card = document.createElement("article");
-  card.className = "citation-card";
+function renderCitation(citation, index, fragment) {
+  const box = document.createElement("article");
+  box.className = "citation-box";
+
   const title = document.createElement("h3");
-  title.textContent = citation.source || "Unknown source";
+  title.textContent = citation.source || "Knowledge Base Document";
+
   const details = document.createElement("dl");
-  const values = [
+  const fields = [
     ["Chunk ID", citation.chunk_id],
     ["Index", citation.chunk_index ?? "—"],
     ["Distance", Number(citation.distance).toFixed(4)],
   ];
-  values.forEach(([term, value]) => {
+
+  fields.forEach(([term, val]) => {
     const dt = document.createElement("dt");
     dt.textContent = term;
     const dd = document.createElement("dd");
-    dd.textContent = value;
+    dd.textContent = val;
     details.append(dt, dd);
   });
-  card.setAttribute("aria-label", `Source ${index + 1}: ${title.textContent}`);
-  card.append(title, details);
-  citations.append(card);
+
+  box.setAttribute("aria-label", `Source ${index + 1}: ${title.textContent}`);
+  box.append(title, details);
+  fragment.appendChild(box);
 }
 
 function friendlyError(response, body) {
   if (response.status === 503) {
-    return body?.detail ?? "The AI service is temporarily unavailable. Please try again shortly.";
+    return body?.detail ?? "The AI service is temporarily unavailable. Please verify API keys and network.";
   }
   if (response.status >= 500) {
-    return "The backend had a problem processing your request. Please try again.";
+    return "The Harshu AI OS backend encountered an unexpected error. Please check server logs.";
   }
-  return body?.detail ?? "Please check your question and try again.";
+  return body?.detail ?? "Please check your prompt and try again.";
 }
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+// Form Submission Handler
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
   const prompt = question.value.trim();
   if (!prompt) return;
 
@@ -176,57 +240,66 @@ form.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: prompt }),
     });
+
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(friendlyError(response, body));
 
     clearError();
     answer.textContent = body.answer;
-    metadata.replaceChildren();
+
+    // Build metadata chips with DocumentFragment for performance
+    const metaFragment = document.createDocumentFragment();
 
     if (activeMode === "ask") {
-      addMeta("Mode", "Normal");
-      addMeta("Model", body.model);
-      addMeta("Complexity", body.complexity);
+      addMeta("Mode", "Normal", metaFragment);
+      addMeta("Model", body.model, metaFragment);
+      addMeta("Complexity", body.complexity, metaFragment);
 
       if (body.tool_used) {
-        addMeta("Tool", "Web search used");
+        addMeta("Tool", "Web search used", metaFragment);
         toolQuery.textContent = body.tool_query || "(empty query)";
         toolSources.replaceChildren();
-        if (body.tool_sources && body.tool_sources.length > 0) {
-          body.tool_sources.forEach(renderWebSource);
+
+        const sourcesList = body.tool_sources ?? [];
+        if (sourcesList.length > 0) {
+          const sourcesFragment = document.createDocumentFragment();
+          sourcesList.forEach((src, idx) => renderWebSource(src, idx, sourcesFragment));
+          toolSources.appendChild(sourcesFragment);
         } else {
-          const emptyItem = document.createElement("p");
-          emptyItem.className = "empty-note";
-          emptyItem.textContent = "No external URLs returned by search.";
-          toolSources.append(emptyItem);
+          const empty = document.createElement("p");
+          empty.className = "empty-note";
+          empty.textContent = "No external URLs returned by search.";
+          toolSources.appendChild(empty);
         }
         toolExecution.hidden = false;
       } else {
-        addMeta("Tool", "No tool used");
+        addMeta("Tool", "No tool used", metaFragment);
         toolExecution.hidden = true;
       }
       ragEvidence.hidden = true;
     } else {
-      // RAG mode
-      addMeta("Mode", "RAG");
-      addMeta("Model", body.model);
-      addMeta("Complexity", body.complexity);
-      addMeta("Grounding", body.abstained ? "Abstained" : "Passed");
+      // RAG Mode
+      addMeta("Mode", "RAG", metaFragment);
+      addMeta("Model", body.model, metaFragment);
+      addMeta("Complexity", body.complexity, metaFragment);
+      addMeta("Grounding", body.abstained ? "Abstained" : "Passed", metaFragment);
 
-      // Grounding banner
-      ragStatusBanner.className = `rag-status-banner ${body.abstained ? "status-abstained" : "status-passed"}`;
+      // Grounding decision banner
+      ragStatusBanner.className = `grounding-banner ${body.abstained ? "banner-abstained" : "banner-passed"}`;
       const statusIcon = document.createElement("span");
       statusIcon.className = "banner-icon";
       statusIcon.textContent = body.abstained ? "⚠" : "✓";
+
       const statusText = document.createElement("div");
       const statusTitle = document.createElement("strong");
       statusTitle.textContent = body.abstained
-        ? "Grounding Decision: Abstained"
-        : "Grounding Decision: Passed (Context Supported)";
+        ? "Grounding Verdict: Abstained"
+        : "Grounding Verdict: Passed (Verified Context)";
       const statusDesc = document.createElement("p");
       statusDesc.textContent = body.abstained
-        ? `Reason: ${body.abstention_reason || "Insufficient supporting context"}`
-        : "Answer generated strictly from verified context chunks.";
+        ? `Reason: ${body.abstention_reason || "Insufficient supporting knowledge in vector store."}`
+        : "Answer synthesized strictly from retrieved and verified knowledge chunks.";
+
       statusText.append(statusTitle, statusDesc);
       ragStatusBanner.append(statusIcon, statusText);
 
@@ -240,35 +313,41 @@ form.addEventListener("submit", async (event) => {
       citations.replaceChildren();
       const citationsList = body.citations ?? [];
       if (citationsList.length > 0) {
-        citationsList.forEach(renderCitation);
+        const citationsFragment = document.createDocumentFragment();
+        citationsList.forEach((cit, idx) => renderCitation(cit, idx, citationsFragment));
+        citations.appendChild(citationsFragment);
       } else {
         const noCitations = document.createElement("p");
         noCitations.className = "empty-note";
         noCitations.textContent = body.abstained
-          ? "No supporting citations (abstained due to distance or judge verdict)."
-          : "No citations available.";
-        citations.append(noCitations);
+          ? "No supporting citations (pipeline abstained due to threshold distance)."
+          : "No citations recorded.";
+        citations.appendChild(noCitations);
       }
 
-      // Execution & Debug Details
+      // Debug Details
       ragJudgeReason.textContent = body.judge_reason || "None recorded";
       ragChunkCount.textContent = String(body.ids?.length ?? 0);
       ragIds.textContent = (body.ids ?? []).join(", ") || "None";
       ragDistances.textContent = (body.distances ?? []).map((d) => Number(d).toFixed(4)).join(", ") || "None";
       ragMetadata.textContent = JSON.stringify(body.metadatas ?? [], null, 2);
-      context.textContent = body.context ?? "No retrieved evidence was returned.";
+      context.textContent = body.context ?? "No retrieved context returned.";
 
       toolExecution.hidden = true;
       ragEvidence.hidden = false;
     }
 
+    metadata.replaceChildren(metaFragment);
     result.hidden = false;
-  } catch (error) {
+
+    // Smoothly scroll result into viewport
+    result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (err) {
     if (requestId !== latestRequestId) return;
     errorMessage.textContent =
-      error instanceof TypeError
-        ? "We couldn’t reach the backend. Confirm it is running at http://127.0.0.1:8000."
-        : error.message;
+      err instanceof TypeError
+        ? "Unable to connect to the backend server. Verify that FastAPI is running at http://127.0.0.1:8000."
+        : err.message;
     errorPanel.hidden = false;
   } finally {
     setLoading(false);
