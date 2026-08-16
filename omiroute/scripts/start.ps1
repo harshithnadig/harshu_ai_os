@@ -30,6 +30,7 @@ foreach ($envFile in @($RootEnv, $SubsystemEnv)) {
                 $varName = $parts[0].Trim()
                 $varVal = $parts[1].Trim().Trim('"').Trim("'")
                 [System.Environment]::SetEnvironmentVariable($varName, $varVal, [System.EnvironmentVariableTarget]::Process)
+                Set-Item -Path "env:$varName" -Value $varVal
             }
         }
     }
@@ -38,15 +39,15 @@ foreach ($envFile in @($RootEnv, $SubsystemEnv)) {
 $UpstreamDir = Join-Path $PSScriptRoot "..\upstream\OmniRoute"
 $RunNextMjs = Join-Path $UpstreamDir "scripts\dev\run-next.mjs"
 
-if (Test-Path $RunNextMjs) {
-    Write-Host "[EXEC] Starting via local upstream distribution (run-next.mjs)..." -ForegroundColor Green
-    Start-Process -FilePath "node" -ArgumentList "`"$RunNextMjs`" dev --port $Port" -WorkingDirectory $UpstreamDir -NoNewWindow
-} elseif (Get-Command "omniroute" -ErrorAction SilentlyContinue) {
+if (Get-Command "omniroute" -ErrorAction SilentlyContinue) {
     Write-Host "[EXEC] Starting via global omniroute binary..." -ForegroundColor Green
     Start-Process -FilePath "omniroute" -ArgumentList "serve --port $Port --no-open" -NoNewWindow
 } elseif (Get-Command "npx" -ErrorAction SilentlyContinue) {
     Write-Host "[EXEC] Starting via npx omniroute..." -ForegroundColor Green
     Start-Process -FilePath "npx.cmd" -ArgumentList "-y omniroute@3.8.49 serve --port $Port --no-open" -NoNewWindow
+} elseif (Test-Path $RunNextMjs) {
+    Write-Host "[EXEC] Starting via local upstream distribution (run-next.mjs)..." -ForegroundColor Green
+    Start-Process -FilePath "node" -ArgumentList "`"$RunNextMjs`" dev --port $Port" -WorkingDirectory $UpstreamDir -NoNewWindow
 } else {
     Write-Error "[ERROR] Neither local omniroute distribution nor node was found. Please install Node.js."
     exit 1
