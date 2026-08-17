@@ -1,7 +1,7 @@
 """HTTP boundary for Harshu AI OS.
 
-This file validates requests and chooses the appropriate application workflow;
-retrieval and provider details remain in their owning modules.
+This file validates requests and exposes unified and diagnostic API endpoints;
+planning, retrieval, and provider details remain in their owning modules.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -15,7 +15,6 @@ from harshu_ai_os.api.schemas import (
     AskResponse,
 )
 from harshu_ai_os.core import get_logger
-from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import LLMServiceError
 from harshu_ai_os.llm.router import choose_route, classify_task_with_model
 from harshu_ai_os.llm.tools import (
@@ -23,6 +22,7 @@ from harshu_ai_os.llm.tools import (
     RAG_LOOKUP_TOOL_SCHEMA,
     WEB_SEARCH_TOOL_SCHEMA,
 )
+from harshu_ai_os.orchestrator import execute_request
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
 from harshu_ai_os.rag.service import (
@@ -57,44 +57,39 @@ def choose_request_route(question: str):
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest):
-    """Handle the direct-generation path with optional single-round tool calling."""
+    """Handle unified request orchestration (Direct, Agent, or Strict RAG)."""
     try:
-        classification, route = choose_request_route(request.question)
-
-        result = call_llm(
-            route,
-            request.question,
-            tools=[WEB_SEARCH_TOOL_SCHEMA],
-            available_tools=AVAILABLE_TOOLS,
-            return_tool_info=True,
+        result = execute_request(request.question)
+        logger.info(
+            "ask_workflow=%s model=%s complexity=%s",
+            result.get("workflow_used"),
+            result.get("model"),
+            result.get("complexity"),
         )
-
-        logger.info("model=%s", route["model"])
-        if isinstance(result, dict):
-            return {
-                "complexity": classification.complexity,
-                "answer": result.get("answer", ""),
-                "model": route["model"],
-                "tool_used": result.get("tool_used", False),
-                "tool_name": result.get("tool_name"),
-                "tool_query": result.get("tool_query"),
-                "tool_sources": result.get("tool_sources", []),
-            }
-
         return {
-            "complexity": classification.complexity,
-            "answer": str(result),
-            "model": route["model"],
-            "tool_used": False,
-            "tool_name": None,
-            "tool_query": None,
-            "tool_sources": [],
+            "answer": result.get("answer", ""),
+            "complexity": result.get("complexity", "general"),
+            "workflow_used": result.get("workflow_used", "direct"),
+            "model": result.get("model", ""),
+            "tool_used": result.get("tool_used", False),
+            "tool_calls_count": result.get("tool_calls_count", 0),
+            "tool_sources": result.get("tool_sources", []),
+            "citations": result.get("citations", []),
+            "abstained": result.get("abstained", False),
+            "abstention_reason": result.get("abstention_reason"),
+            "judge_reason": result.get("judge_reason"),
+            "tool_name": result.get("tool_name"),
+            "tool_query": result.get("tool_query"),
+            "stopped_reason": result.get("stopped_reason"),
+            "steps_taken": result.get("steps_taken", 0),
         }
     except LLMServiceError as error:
         logger.error(error)
         raise HTTPException(
             status_code=503, detail="AI service temporarily unavailable"
         )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/ask/rag", response_model=AskRagResponse)
@@ -145,8 +140,6 @@ def ask_rag(request: AskRequest):
             detail="AI service temporarily unavailable",
         )
     except ValueError as error:
-        # Retrieval validation errors are caused by the request or local index,
-        # not an unavailable model provider.
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
@@ -185,4 +178,3 @@ def ask_agent(request: AskRequest):
             status_code=503,
             detail="AI service temporarily unavailable",
         )
-

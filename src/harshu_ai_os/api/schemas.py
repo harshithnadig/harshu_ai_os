@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class AskRequest(BaseModel):
-    """The only user input accepted by both answer endpoints."""
+    """The only user input accepted by answer endpoints."""
 
     question: str
 
@@ -18,18 +18,6 @@ class WebSource(BaseModel):
     url: str
 
 
-class AskResponse(BaseModel):
-    """Response for a direct model answer, including any tool execution details."""
-
-    answer: str
-    complexity: str
-    model: str
-    tool_used: bool = False
-    tool_name: str | None = None
-    tool_query: str | None = None
-    tool_sources: list[WebSource] = []
-
-
 class Citation(BaseModel):
     """A retrieved source chunk supplied to the RAG model."""
 
@@ -37,6 +25,26 @@ class Citation(BaseModel):
     chunk_id: str
     chunk_index: int | None
     distance: float
+
+
+class AskResponse(BaseModel):
+    """Unified response for orchestrator queries across all workflows."""
+
+    answer: str
+    complexity: str
+    workflow_used: str = "direct"
+    model: str
+    tool_used: bool = False
+    tool_calls_count: int = 0
+    tool_sources: list[WebSource] = []
+    citations: list[Citation] = []
+    abstained: bool = False
+    abstention_reason: str | None = None
+    judge_reason: str | None = None
+    tool_name: str | None = None
+    tool_query: str | None = None
+    stopped_reason: str | None = None
+    steps_taken: int = 0
 
 
 class AskRagResponse(BaseModel):
@@ -70,4 +78,3 @@ class AskAgentResponse(BaseModel):
     tool_sources: list[WebSource] = []
     stopped_reason: str
     tool_used: bool = False
-
