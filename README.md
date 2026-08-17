@@ -1,94 +1,75 @@
 # Harshu AI OS
 
-Harshu AI OS is a learning-first AI engineering project with a FastAPI backend and a responsive web interface. It supports direct AI questions and retrieval-augmented generation (RAG) over locally indexed notes.
+Harshu AI OS is a learning-first AI engineering project with a FastAPI backend and a responsive web interface. It features a Unified Request Orchestrator that automatically classifies incoming questions and chooses the appropriate execution workflow (Direct LLM synthesis, multi-tool Agent, or strict document-grounded RAG).
 
-> **Learning mode:** If you are currently studying RAG evaluation metrics, do
-> not read the entire repository. Start with [`LEARNING_NOW.md`](LEARNING_NOW.md),
+> **Learning mode:** If you are currently studying RAG evaluation metrics or agent loops, do
+> not read the entire repository at once. Start with [`LEARNING_NOW.md`](LEARNING_NOW.md),
 > which gives you one small reading path at a time.
 
-The project demonstrates model routing, embeddings, local vector retrieval, grounded answer generation, and structured citations. LangChain is used only where it adds value to the RAG prompt-model-parser workflow; the direct endpoint remains a small LiteLLM call.
+The project demonstrates request planning, model routing, local ChromaDB vector retrieval, sufficiency judging, bounded ReAct agent loops with multi-tool execution (`web_search` and `rag_lookup`), and structured citations.
 
 ## Current features
 
-- Direct questions through `POST /ask`
-- RAG questions through `POST /ask/rag`
-- Automatic question-complexity classification and model routing
-- Local ChromaDB vector storage
-- Google GenAI embeddings
-- Grounded RAG responses with source, chunk ID, chunk index, and distance citations
-- Optional expandable retrieved evidence in the frontend
-- Responsive desktop and mobile interface
+- Unified question endpoint through `POST /ask` with automated planning and workflow dispatch
+- Diagnostic development endpoints `POST /ask/rag` and `POST /ask/agent`
+- Automatic question complexity and information requirement classification via `RequestPlan`
+- Deterministic workflow selection:
+  - **DIRECT:** Fast language model synthesis for ordinary knowledge questions
+  - **AGENT:** Bounded ReAct agent loop supporting `web_search` and `rag_lookup` with deterministic multi-domain coverage guards
+  - **STRICT_RAG:** Grounded RAG with ChromaDB retrieval, cosine distance gating, LLM sufficiency judge, supporting chunks, and citation/abstention guarantees
+- Local ChromaDB vector storage and embeddings routed through the OmniRoute logical embedding role
+- Responsive desktop and mobile interface with telemetry inspector drawer
 - Friendly loading, backend, and network states
 - FastAPI request and response validation with Pydantic
-- Automated backend tests
+- Automated backend and unit test suites
 
 ## Request flow
 
-Direct answers use the shortest path:
+All user questions are sent to the primary entrypoint `POST /ask`:
 
 ```text
-Frontend → FastAPI → router → LiteLLM client → selected provider
+User → POST /ask
+        │
+        ▼
+Request Planner (classify complexity, information source & grounding requirement)
+        │
+        ▼
+Validated RequestPlan
+        │
+        ├─ DIRECT      ──► LiteLLM client ──► Selected Model Route
+        │
+        ├─ AGENT       ──► Bounded ReAct Loop (tools: web_search, rag_lookup)
+        │
+        └─ STRICT_RAG  ──► Chroma retrieval ──► Distance gate ──► Sufficiency Judge ──► Grounded Synthesis
 ```
 
-RAG answers add retrieval and LangChain composition:
+### Workflow Execution Details
 
-```text
-Frontend → FastAPI → router → RAG service
-                              ├─ Chroma retrieval
-                              └─ LangChain prompt → selected model → parser
-                           → answer + citations
-```
+1. **DIRECT:** Used for ordinary questions that do not require external web retrieval or internal project documents.
+2. **AGENT:** Used for requests requiring dynamic tool execution, live external information (`web_search`), internal knowledge retrieval (`rag_lookup`), or mixed requirements.
+3. **STRICT_RAG:** Used when questions explicitly require strict grounding against indexed project documents, returning verified citations and abstaining if evidence is insufficient.
+
+> **Note on Diagnostic Endpoints:** `POST /ask/rag` and `POST /ask/agent` remain available as diagnostic and development endpoints for isolated testing, but are not required for normal frontend usage.
 
 ## Small codebase map
 
 ```text
 api/main.py
-├─ /ask     → llm/router.py → llm/client.py
-└─ /ask/rag → rag/service.py
-               ├─ rag/chroma_store.py
-               ├─ rag/embedding_client.py
-               ├─ rag/ingestion.py
-               └─ llm/client.py
+├─ /ask       → orchestrator/service.py
+│                ├─ llm/router.py (RequestPlan, choose_route)
+│                ├─ llm/client.py (direct call)
+│                ├─ agents/loop.py (bounded ReAct agent loop)
+│                └─ rag/service.py (strict RAG pipeline)
+├─ /ask/agent → agents/loop.py (diagnostic endpoint)
+└─ /ask/rag   → rag/service.py (diagnostic endpoint)
+                 ├─ rag/chroma_store.py
+                 ├─ rag/embedding_client.py
+                 └─ rag/judge.py
 
-core.py             # shared configuration and logging
+core.py         # shared configuration and logging
 ```
 
-The ordered learning references are indexed in
-[`jupyter/README.md`](jupyter/README.md). They explain the harder Python,
-routing, reliability, RAG, LangChain, testing, and API-flow concepts using
-synthetic examples and fake model responses.
-
-## How to read this repository
-
-Do not learn every folder at once. Follow one request from left to right:
-
-```text
-API receives question -> service coordinates work -> small helpers do one job
-```
-
-Docstrings explain what a module or function owns. Comments explain decisions
-that are not obvious from the code. Ordinary Python such as appending an item
-is intentionally left uncommented so the important explanations stand out.
-
-## Optional advanced lab: reranking
-
-`rag/reranker.py` contains a second-stage retrieval experiment:
-
-```text
-Chroma finds 10 candidates -> CrossEncoder scores them -> keep the best 5
-```
-
-It is deliberately separate from the live `/ask/rag` path. This lets you learn
-and measure the technique before deciding whether its extra latency is useful.
-Install the optional local model dependency only when you reach that lesson:
-
-```bash
-uv sync --extra reranking
-uv run python -m harshu_ai_os.evaluations.evaluate_reranker
-```
-
-The experiment requires the normal embedding credentials and an already
-ingested local Chroma collection. Its test uses a fake model and needs neither.
+The ordered learning references are indexed in [`jupyter/README.md`](jupyter/README.md).
 
 ## Prerequisites
 
@@ -118,7 +99,7 @@ GEMINI_API_KEY=your_key_here
 GROQ_API_KEY=your_key_here
 ```
 
-Use your own API keys and never commit `.env`. The repository contains only placeholder values in `.env.example`.
+Use your own API keys and never commit `.env`.
 
 ## Backend setup
 
@@ -153,15 +134,7 @@ npm run dev
 
 Open the frontend at `http://localhost:5173`.
 
-The frontend expects the backend at `http://127.0.0.1:8000` by default. To use another backend URL, set `VITE_API_BASE_URL` when starting or building the frontend.
-
 ## Ingest the synthetic example document
-
-The repository includes a safe synthetic document at:
-
-```text
-examples/documents/harshu_ai_os_overview.txt
-```
 
 With `GEMINI_API_KEY` configured, run this command from the repository root:
 
@@ -169,7 +142,7 @@ With `GEMINI_API_KEY` configured, run this command from the repository root:
 uv run python scripts/ingest_documents.py
 ```
 
-The script splits the example into fixed-size word chunks, generates embeddings, and upserts the chunks into the local Chroma collection. The generated database is stored under `data/chroma/` and is intentionally excluded from Git.
+The script splits the example into fixed-size chunks, generates embeddings, and upserts the chunks into the local Chroma collection under `data/chroma/`.
 
 ## Verification
 
@@ -185,8 +158,6 @@ Run frontend checks from the `frontend` directory:
 npm run lint
 npm run build
 ```
-
-Generated frontend output is written to `frontend/dist/` and is not committed.
 
 ## Current limitations
 
