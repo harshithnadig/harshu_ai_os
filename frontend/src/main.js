@@ -4,8 +4,6 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 const form = document.getElementById("ask-form");
 const question = document.getElementById("question");
 const submitButton = document.getElementById("submit-button");
-const modeButtons = document.querySelectorAll(".mode-btn:not(.disabled)");
-const modeIndicator = document.getElementById("mode-indicator");
 const routeIndicator = document.getElementById("route-indicator");
 const liveRouteNode = document.getElementById("live-route-node");
 
@@ -15,7 +13,7 @@ const metadata = document.getElementById("metadata");
 const errorPanel = document.getElementById("error");
 const errorMessage = document.getElementById("error-message");
 
-// Normal Mode: Web Search Tool Elements
+// Agent / Web Search Tool Elements
 const toolExecution = document.getElementById("tool-execution");
 const toolQuery = document.getElementById("tool-query");
 const toolSources = document.getElementById("tool-sources");
@@ -41,40 +39,7 @@ const inspectorToggleBtn = document.getElementById("inspector-toggle-btn");
 const inspectorCloseBtn = document.getElementById("inspector-close-btn");
 const inspectorBackdrop = document.getElementById("inspector-backdrop");
 
-let activeMode = "ask";
 let latestRequestId = 0;
-
-// Mode Descriptions
-const modeLabels = {
-  ask: "MODE: NORMAL DIRECT",
-  rag: "MODE: GROUNDED RAG",
-};
-
-// Mode Switcher Handlers
-modeButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    setMode(btn.dataset.mode);
-  });
-});
-
-function setMode(mode) {
-  if (!mode || mode === activeMode) return;
-  activeMode = mode;
-
-  modeButtons.forEach((btn) => {
-    const isSelected = btn.dataset.mode === mode;
-    btn.classList.toggle("active", isSelected);
-    btn.setAttribute("aria-checked", String(isSelected));
-  });
-
-  if (modeIndicator) {
-    modeIndicator.textContent = modeLabels[mode] || "MODE: UNKNOWN";
-  }
-
-  if (liveRouteNode) {
-    liveRouteNode.textContent = mode === "rag" ? "rag-pipeline" : "harshu-general";
-  }
-}
 
 // Inspector Drawer Handlers
 function toggleInspector(show) {
@@ -114,9 +79,6 @@ window.addEventListener("keydown", (e) => {
 function setLoading(isLoading) {
   submitButton.disabled = isLoading;
   question.disabled = isLoading;
-  modeButtons.forEach((btn) => {
-    btn.disabled = isLoading;
-  });
 
   submitButton.innerHTML = isLoading
     ? '<span class="spinner" aria-hidden="true"></span><span>Thinking...</span>'
@@ -158,7 +120,7 @@ function addMeta(label, value, fragment) {
   }
 }
 
-function renderWebSource(source, index, fragment) {
+function renderToolSource(source, index, fragment) {
   const row = document.createElement("div");
   row.className = "web-source-row";
 
@@ -168,18 +130,24 @@ function renderWebSource(source, index, fragment) {
 
   const anchor = document.createElement("a");
   anchor.className = "source-anchor";
-  anchor.textContent = source.title || source.url || "External Web Source";
+  anchor.textContent = source.title || source.url || "Evidence Source";
   anchor.href = source.url || "#";
-  anchor.target = "_blank";
-  anchor.rel = "noopener noreferrer";
+  if (source.url) {
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+  }
 
   const host = document.createElement("span");
   host.className = "source-host";
-  try {
-    const parsed = new URL(source.url);
-    host.textContent = parsed.hostname.replace(/^www\./, "");
-  } catch {
-    host.textContent = source.url || "";
+  if (source.url) {
+    try {
+      const parsed = new URL(source.url);
+      host.textContent = parsed.hostname.replace(/^www\./, "");
+    } catch {
+      host.textContent = source.url || "";
+    }
+  } else {
+    host.textContent = "Local Document";
   }
 
   row.append(num, anchor, host);
@@ -223,7 +191,7 @@ function friendlyError(response, body) {
   return body?.detail ?? "Please check your prompt and try again.";
 }
 
-// Form Submission Handler
+// Unified Form Submission Handler (Always calls POST /ask)
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const prompt = question.value.trim();
@@ -234,8 +202,7 @@ form.addEventListener("submit", async (e) => {
   setLoading(true);
 
   try {
-    const endpoint = activeMode === "rag" ? "/ask/rag" : "/ask";
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: prompt }),
@@ -247,44 +214,30 @@ form.addEventListener("submit", async (e) => {
     clearError();
     answer.textContent = body.answer;
 
-    // Build metadata chips with DocumentFragment for performance
+    if (liveRouteNode && body.model) {
+      liveRouteNode.textContent = body.model.replace(/^openai\//, "");
+    }
+    if (routeIndicator && body.complexity) {
+      routeIndicator.textContent = body.complexity.toUpperCase();
+    }
+
+    // Build metadata chips with DocumentFragment
     const metaFragment = document.createDocumentFragment();
+    const workflowName = (body.workflow_used || "direct").toUpperCase();
+    addMeta("Workflow", workflowName, metaFragment);
+    addMeta("Model", body.model, metaFragment);
+    addMeta("Complexity", body.complexity, metaFragment);
 
-    if (activeMode === "ask") {
-      addMeta("Mode", "Normal", metaFragment);
-      addMeta("Model", body.model, metaFragment);
-      addMeta("Complexity", body.complexity, metaFragment);
-
-      if (body.tool_used) {
-        addMeta("Tool", "Web search used", metaFragment);
-        toolQuery.textContent = body.tool_query || "(empty query)";
-        toolSources.replaceChildren();
-
-        const sourcesList = body.tool_sources ?? [];
-        if (sourcesList.length > 0) {
-          const sourcesFragment = document.createDocumentFragment();
-          sourcesList.forEach((src, idx) => renderWebSource(src, idx, sourcesFragment));
-          toolSources.appendChild(sourcesFragment);
-        } else {
-          const empty = document.createElement("p");
-          empty.className = "empty-note";
-          empty.textContent = "No external URLs returned by search.";
-          toolSources.appendChild(empty);
-        }
-        toolExecution.hidden = false;
-      } else {
-        addMeta("Tool", "No tool used", metaFragment);
-        toolExecution.hidden = true;
-      }
-      ragEvidence.hidden = true;
-    } else {
-      // RAG Mode
-      addMeta("Mode", "RAG", metaFragment);
-      addMeta("Model", body.model, metaFragment);
-      addMeta("Complexity", body.complexity, metaFragment);
+    if (body.workflow_used === "strict_rag" || body.citations?.length > 0 || body.abstained) {
       addMeta("Grounding", body.abstained ? "Abstained" : "Passed", metaFragment);
+    }
 
-      // Grounding decision banner
+    if (body.tool_used) {
+      addMeta("Tool Calls", `${body.tool_calls_count || 1}`, metaFragment);
+    }
+
+    // 1. Strict RAG / Document Grounding Display
+    if (body.workflow_used === "strict_rag" || body.abstained || (body.citations && body.citations.length > 0)) {
       ragStatusBanner.className = `grounding-banner ${body.abstained ? "banner-abstained" : "banner-passed"}`;
       const statusIcon = document.createElement("span");
       statusIcon.className = "banner-icon";
@@ -303,11 +256,13 @@ form.addEventListener("submit", async (e) => {
       statusText.append(statusTitle, statusDesc);
       ragStatusBanner.append(statusIcon, statusText);
 
-      // Timings
-      timeRetrieval.textContent = `${Number(body.retrieval_ms || 0).toFixed(1)} ms`;
-      timeJudge.textContent = `${Number(body.judge_ms || 0).toFixed(1)} ms`;
-      timeGeneration.textContent = `${Number(body.generation_ms || 0).toFixed(1)} ms`;
-      timeTotal.textContent = `${Number(body.total_ms || 0).toFixed(1)} ms`;
+      // Timings if present
+      if (timeRetrieval && body.retrieval_ms !== undefined) {
+        timeRetrieval.textContent = `${Number(body.retrieval_ms || 0).toFixed(1)} ms`;
+        timeJudge.textContent = `${Number(body.judge_ms || 0).toFixed(1)} ms`;
+        timeGeneration.textContent = `${Number(body.generation_ms || 0).toFixed(1)} ms`;
+        timeTotal.textContent = `${Number(body.total_ms || 0).toFixed(1)} ms`;
+      }
 
       // Citations
       citations.replaceChildren();
@@ -326,15 +281,49 @@ form.addEventListener("submit", async (e) => {
       }
 
       // Debug Details
-      ragJudgeReason.textContent = body.judge_reason || "None recorded";
-      ragChunkCount.textContent = String(body.ids?.length ?? 0);
-      ragIds.textContent = (body.ids ?? []).join(", ") || "None";
-      ragDistances.textContent = (body.distances ?? []).map((d) => Number(d).toFixed(4)).join(", ") || "None";
-      ragMetadata.textContent = JSON.stringify(body.metadatas ?? [], null, 2);
-      context.textContent = body.context ?? "No retrieved context returned.";
+      if (ragJudgeReason) {
+        ragJudgeReason.textContent = body.judge_reason || "None recorded";
+      }
+      if (ragChunkCount) {
+        ragChunkCount.textContent = String(body.ids?.length ?? (body.citations?.length ?? 0));
+      }
+      if (ragIds) {
+        ragIds.textContent = (body.ids ?? body.citations?.map((c) => c.chunk_id) ?? []).join(", ") || "None";
+      }
+      if (ragDistances) {
+        ragDistances.textContent = (body.distances ?? body.citations?.map((c) => c.distance) ?? []).map((d) => Number(d).toFixed(4)).join(", ") || "None";
+      }
+      if (ragMetadata) {
+        ragMetadata.textContent = JSON.stringify(body.metadatas ?? [], null, 2);
+      }
+      if (context) {
+        context.textContent = body.context ?? "No retrieved context returned.";
+      }
 
-      toolExecution.hidden = true;
       ragEvidence.hidden = false;
+    } else {
+      ragEvidence.hidden = true;
+    }
+
+    // 2. Agent / Tool Execution Display
+    if (body.workflow_used === "agent" || body.tool_used) {
+      toolQuery.textContent = body.tool_query || `${body.tool_calls_count || 1} tool call(s) executed by agent`;
+      toolSources.replaceChildren();
+
+      const sourcesList = body.tool_sources ?? [];
+      if (sourcesList.length > 0) {
+        const sourcesFragment = document.createDocumentFragment();
+        sourcesList.forEach((src, idx) => renderToolSource(src, idx, sourcesFragment));
+        toolSources.appendChild(sourcesFragment);
+      } else {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "No external URLs or document notes returned.";
+        toolSources.appendChild(empty);
+      }
+      toolExecution.hidden = false;
+    } else {
+      toolExecution.hidden = true;
     }
 
     metadata.replaceChildren(metaFragment);

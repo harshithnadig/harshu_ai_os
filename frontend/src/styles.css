@@ -531,7 +531,36 @@ button {
   color: var(--text-muted);
 }
 
-/* Mode Switch Tabs */
+/* Orchestrator Status Badge */
+.orchestrator-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 9999px;
+  backdrop-filter: blur(10px);
+}
+
+.orchestrator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: pulse-dot 2.5s ease-in-out infinite;
+}
+
+.orchestrator-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--cyan);
+}
+
+/* Mode Switch Tabs (Legacy/Diagnostic Support) */
 .mode-switch {
   display: flex;
   gap: 4px;

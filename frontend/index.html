@@ -96,30 +96,9 @@
             <span class="surface-title">COMMAND SURFACE</span>
           </div>
 
-          <div class="mode-switch" role="radiogroup" aria-label="Intelligence execution mode">
-            <button class="mode-btn active" type="button" role="radio" aria-checked="true" data-mode="ask" id="mode-btn-normal">
-              <span class="mode-glyph">✦</span>
-              <div class="mode-info">
-                <strong>Normal</strong>
-                <small>Direct / Web Tools</small>
-              </div>
-            </button>
-
-            <button class="mode-btn" type="button" role="radio" aria-checked="false" data-mode="rag" id="mode-btn-rag">
-              <span class="mode-glyph">⌘</span>
-              <div class="mode-info">
-                <strong>RAG</strong>
-                <small>Grounded Knowledge</small>
-              </div>
-            </button>
-
-            <button class="mode-btn disabled" type="button" role="radio" aria-checked="false" disabled title="Autonomous Agent execution (coming soon)">
-              <span class="mode-glyph">⌖</span>
-              <div class="mode-info">
-                <strong>Agent</strong>
-                <small>Reserved</small>
-              </div>
-            </button>
+          <div class="orchestrator-status-badge" aria-label="Execution orchestration">
+            <span class="orchestrator-dot"></span>
+            <span class="orchestrator-label">UNIFIED REQUEST ORCHESTRATOR</span>
           </div>
         </div>
 
@@ -143,7 +122,7 @@
               <span class="telemetry-sep">/</span>
               <span class="telemetry-item">GATEWAY: <strong>OMNIROUTE</strong></span>
               <span class="telemetry-sep">/</span>
-              <span class="telemetry-item" id="mode-indicator">MODE: NORMAL DIRECT</span>
+              <span class="telemetry-item" id="mode-indicator">DISPATCH: AUTO-ORCHESTRATED</span>
             </div>
 
             <div class="action-cluster">
