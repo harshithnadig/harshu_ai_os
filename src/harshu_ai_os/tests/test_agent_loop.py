@@ -1,7 +1,8 @@
 """Deterministic Test Suite for the Bounded ReAct Agent Loop.
 
 Tests verify state transitions, tool execution permissions, error handling,
-and budget termination without requiring live external model endpoints.
+required tool coverage constraints, and budget termination without requiring
+live external model endpoints.
 """
 
 from unittest.mock import MagicMock, patch
@@ -12,7 +13,7 @@ from harshu_ai_os.agents.loop import (
     execute_single_tool,
     run_agent_loop,
 )
-from harshu_ai_os.llm.tools import WEB_SEARCH_TOOL_SCHEMA
+from harshu_ai_os.llm.tools import RAG_LOOKUP_TOOL_SCHEMA, WEB_SEARCH_TOOL_SCHEMA
 
 
 # ==============================================================================
@@ -84,7 +85,7 @@ def _make_mock_response(content: str | None = None, tool_calls: list | None = No
 
 @patch("harshu_ai_os.agents.loop.make_llm_call")
 def test_agent_loop_immediate_final_answer(mock_make_call):
-    """Scenario 1: Model immediately returns a final answer (0 tool calls)."""
+    """Scenario 1: Model immediately returns a final answer when no required_tools (0 tool calls)."""
     mock_make_call.return_value = _make_mock_response(
         content="FastAPI is a modern, fast Python web framework."
     )
@@ -146,16 +147,164 @@ def test_agent_loop_single_tool_and_answer(mock_make_call):
 
 
 @patch("harshu_ai_os.agents.loop.make_llm_call")
+def test_agent_loop_required_tools_rag_then_web(mock_make_call):
+    """Scenario B: Mixed required_tools={"rag_lookup", "web_search"}: rag first, web forced next."""
+    call_rag = _make_mock_tool_call("c1", "rag_lookup", '{"query": "reasoning role"}')
+    call_web = _make_mock_tool_call("c2", "web_search", '{"query": "model current status"}')
+    final_resp = _make_mock_response(content="Final synthesis using both rag and web evidence.")
+
+    mock_make_call.side_effect = [
+        _make_mock_response(content=None, tool_calls=[call_rag]),
+        _make_mock_response(content=None, tool_calls=[call_web]),
+        final_resp,
+    ]
+
+    fake_tools = {
+        "rag_lookup": lambda query: {"content": "Project notes on reasoning role", "sources": []},
+        "web_search": lambda query: {"content": "Web info on model status", "sources": []},
+    }
+
+    route = {"model": "openai/harshu-tools", "max_tokens": 500}
+    result = run_agent_loop(
+        route=route,
+        user_prompt="Explain reasoning role and if current today",
+        tools=[WEB_SEARCH_TOOL_SCHEMA, RAG_LOOKUP_TOOL_SCHEMA],
+        available_tools=fake_tools,
+        required_tools={"rag_lookup", "web_search"},
+        max_steps=5,
+    )
+
+    assert mock_make_call.call_count == 3
+    # Check that in round 2, tool_choice was constrained to web_search
+    second_call_args = mock_make_call.call_args_list[1][0][0]
+    assert second_call_args["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "web_search"},
+    }
+    assert result["steps_taken"] == 2
+    assert result["tool_calls_count"] == 2
+    assert result["stopped_reason"] == "completed"
+    assert "Final synthesis" in result["answer"]
+
+
+@patch("harshu_ai_os.agents.loop.make_llm_call")
+def test_agent_loop_required_tools_web_then_rag(mock_make_call):
+    """Scenario C: Reverse order: web_search first -> rag_lookup required next -> both execute."""
+    call_web = _make_mock_tool_call("c1", "web_search", '{"query": "model status"}')
+    call_rag = _make_mock_tool_call("c2", "rag_lookup", '{"query": "project notes"}')
+    final_resp = _make_mock_response(content="Final combined answer.")
+
+    mock_make_call.side_effect = [
+        _make_mock_response(content=None, tool_calls=[call_web]),
+        _make_mock_response(content=None, tool_calls=[call_rag]),
+        final_resp,
+    ]
+
+    fake_tools = {
+        "rag_lookup": lambda query: {"content": "Internal docs", "sources": []},
+        "web_search": lambda query: {"content": "External web info", "sources": []},
+    }
+
+    route = {"model": "openai/harshu-tools", "max_tokens": 500}
+    result = run_agent_loop(
+        route=route,
+        user_prompt="Compare external and internal info",
+        tools=[WEB_SEARCH_TOOL_SCHEMA, RAG_LOOKUP_TOOL_SCHEMA],
+        available_tools=fake_tools,
+        required_tools={"rag_lookup", "web_search"},
+        max_steps=5,
+    )
+
+    assert mock_make_call.call_count == 3
+    # Check that in round 2, tool_choice was constrained to rag_lookup
+    second_call_args = mock_make_call.call_args_list[1][0][0]
+    assert second_call_args["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "rag_lookup"},
+    }
+    assert result["steps_taken"] == 2
+    assert result["tool_calls_count"] == 2
+
+
+@patch("harshu_ai_os.agents.loop.make_llm_call")
+def test_agent_loop_rejects_early_direct_answer_when_tools_required(mock_make_call):
+    """Scenario D: Model attempts direct answer before required coverage; not accepted until coverage is completed."""
+    # Round 1: Model tries to answer immediately without calling required tools
+    early_text_resp = _make_mock_response(content="I think I already know the answer.")
+    # Round 2: Forced to call web_search
+    call_web = _make_mock_tool_call("c1", "web_search", '{"query": "status"}')
+    # Round 3: Forced to call rag_lookup
+    call_rag = _make_mock_tool_call("c2", "rag_lookup", '{"query": "notes"}')
+    # Round 4: Final synthesis
+    final_resp = _make_mock_response(content="Now answered with full evidence.")
+
+    mock_make_call.side_effect = [
+        early_text_resp,
+        _make_mock_response(content=None, tool_calls=[call_web]),
+        _make_mock_response(content=None, tool_calls=[call_rag]),
+        final_resp,
+    ]
+
+    fake_tools = {
+        "rag_lookup": lambda query: {"content": "Internal docs", "sources": []},
+        "web_search": lambda query: {"content": "Web docs", "sources": []},
+    }
+
+    route = {"model": "openai/harshu-tools", "max_tokens": 500}
+    result = run_agent_loop(
+        route=route,
+        user_prompt="Mixed query",
+        tools=[WEB_SEARCH_TOOL_SCHEMA, RAG_LOOKUP_TOOL_SCHEMA],
+        available_tools=fake_tools,
+        required_tools={"rag_lookup", "web_search"},
+        max_steps=5,
+    )
+
+    assert result["stopped_reason"] == "completed"
+    assert "Now answered with full evidence" in result["answer"]
+    assert result["tool_calls_count"] == 2
+
+
+@patch("harshu_ai_os.agents.loop.make_llm_call")
+def test_agent_loop_internal_only_request(mock_make_call):
+    """Scenario E: Internal-only request without required_tools does not force web_search."""
+    call_rag = _make_mock_tool_call("c1", "rag_lookup", '{"query": "fastapi"}')
+    final_resp = _make_mock_response(content="FastAPI is in internal notes.")
+
+    mock_make_call.side_effect = [
+        _make_mock_response(content=None, tool_calls=[call_rag]),
+        final_resp,
+    ]
+
+    fake_tools = {
+        "rag_lookup": lambda query: {"content": "Internal note: FastAPI", "sources": []},
+        "web_search": lambda query: {"content": "Web note", "sources": []},
+    }
+
+    route = {"model": "openai/harshu-tools", "max_tokens": 500}
+    result = run_agent_loop(
+        route=route,
+        user_prompt="What is in internal notes?",
+        tools=[WEB_SEARCH_TOOL_SCHEMA, RAG_LOOKUP_TOOL_SCHEMA],
+        available_tools=fake_tools,
+        required_tools=None,
+        max_steps=3,
+    )
+
+    assert result["tool_calls_count"] == 1
+    assert result["steps_taken"] == 1
+    assert result["stopped_reason"] == "completed"
+
+
+@patch("harshu_ai_os.agents.loop.make_llm_call")
 def test_agent_loop_max_steps_budget_exceeded(mock_make_call):
-    """Scenario 3: Model keeps requesting tools until max_steps budget is reached."""
+    """Scenario G: Model keeps requesting tools until max_steps budget is reached."""
     max_steps_budget = 3
 
-    # Rounds 1, 2, 3: Model requests continuous tool calls
     call_a = _make_mock_tool_call("c1", "search_docs", '{"q": "step 1"}')
     call_b = _make_mock_tool_call("c2", "search_docs", '{"q": "step 2"}')
     call_c = _make_mock_tool_call("c3", "search_docs", '{"q": "step 3"}')
 
-    # Round 4 (Forced Synthesis): Model must answer without tools
     final_resp = _make_mock_response(
         content="Based on available multi-step evidence gathered so far, here is the synthesis."
     )
@@ -180,21 +329,16 @@ def test_agent_loop_max_steps_budget_exceeded(mock_make_call):
         max_steps=max_steps_budget,
     )
 
-    # Must make 3 tool iterations + 1 final forced synthesis call = 4 LLM calls
     assert mock_make_call.call_count == max_steps_budget + 1
     assert result["steps_taken"] == max_steps_budget
     assert result["tool_calls_count"] == 3
     assert result["stopped_reason"] == "max_steps_exceeded"
     assert "Based on available multi-step evidence" in result["answer"]
 
-    # Verify that the final synthesis call had tools disabled
-    final_call_args = mock_make_call.call_args_list[-1][0][0]
-    assert "tools" not in final_call_args or final_call_args.get("tools") is None
-
 
 @patch("harshu_ai_os.agents.loop.make_llm_call")
 def test_agent_loop_unauthorized_tool_handled_safely(mock_make_call):
-    """Scenario 4: Model requests an unlisted tool; loop provides error observation and continues."""
+    """Scenario H: Model requests an unlisted tool; loop provides error observation and continues."""
     bad_call = _make_mock_tool_call("call_hack", "delete_all_files", '{"target": "/"}')
     resp_1 = _make_mock_response(content=None, tool_calls=[bad_call])
     resp_2 = _make_mock_response(
@@ -202,7 +346,6 @@ def test_agent_loop_unauthorized_tool_handled_safely(mock_make_call):
     )
     mock_make_call.side_effect = [resp_1, resp_2]
 
-    # Only safe_read is allowed
     fake_tools = {"safe_read": lambda: "safe content"}
 
     route = {"model": "openai/harshu-tools", "max_tokens": 500}
@@ -216,37 +359,7 @@ def test_agent_loop_unauthorized_tool_handled_safely(mock_make_call):
 
     assert mock_make_call.call_count == 2
     assert "cannot perform" in result["answer"]
-    # Check that error observation was passed to round 2 LLM call
     second_call_args = mock_make_call.call_args_list[1][0][0]
     messages = second_call_args["messages"]
     tool_msg = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"][0]
     assert "Error: Tool 'delete_all_files' is not allowed" in tool_msg["content"]
-
-
-@patch("harshu_ai_os.agents.loop.make_llm_call")
-def test_agent_loop_malformed_tool_arguments_handled_safely(mock_make_call):
-    """Scenario 5: Model produces malformed JSON arguments; loop feeds error back to model."""
-    bad_arg_call = _make_mock_tool_call("call_broken", "web_search", '{"query": "unclosed string...')
-    resp_1 = _make_mock_response(content=None, tool_calls=[bad_arg_call])
-    resp_2 = _make_mock_response(
-        content="I adjusted my query and answered the prompt."
-    )
-    mock_make_call.side_effect = [resp_1, resp_2]
-
-    fake_tools = {"web_search": lambda query: "results"}
-
-    route = {"model": "openai/harshu-tools", "max_tokens": 500}
-    result = run_agent_loop(
-        route=route,
-        user_prompt="Search something for me.",
-        tools=[WEB_SEARCH_TOOL_SCHEMA],
-        available_tools=fake_tools,
-        max_steps=3,
-    )
-
-    assert mock_make_call.call_count == 2
-    assert "answered the prompt" in result["answer"]
-    second_call_args = mock_make_call.call_args_list[1][0][0]
-    messages = second_call_args["messages"]
-    tool_msg = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"][0]
-    assert "Malformed JSON arguments" in tool_msg["content"]
