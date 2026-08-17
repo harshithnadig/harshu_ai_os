@@ -3,7 +3,13 @@
 from unittest.mock import MagicMock, patch
 
 from harshu_ai_os.llm.client import call_llm
-from harshu_ai_os.llm.tools import AVAILABLE_TOOLS, WEB_SEARCH_TOOL_SCHEMA, web_search
+from harshu_ai_os.llm.tools import (
+    AVAILABLE_TOOLS,
+    RAG_LOOKUP_TOOL_SCHEMA,
+    WEB_SEARCH_TOOL_SCHEMA,
+    rag_lookup,
+    web_search,
+)
 
 
 def test_web_search_empty_query():
@@ -303,5 +309,95 @@ def test_call_llm_enforces_primary_source_and_no_invention_contract_on_conflicts
     assert result["tool_used"] is True
     assert len(result["tool_sources"]) == 2
     assert "3.14.6" in result["answer"]
+
+
+def test_rag_lookup_empty_query():
+    """Empty lookup queries return a friendly fallback structure."""
+    res1 = rag_lookup("")
+    assert res1["content"] == "No search query provided."
+    assert res1["sources"] == []
+    assert res1["query"] == ""
+
+    res2 = rag_lookup("   ")
+    assert res2["content"] == "No search query provided."
+    assert res2["sources"] == []
+    assert res2["query"] == ""
+
+
+@patch("harshu_ai_os.llm.tools.get_notes_collection")
+@patch("harshu_ai_os.llm.tools.get_embedding_client")
+@patch("harshu_ai_os.llm.tools.query_notes")
+def test_rag_lookup_success(mock_query_notes, mock_get_client, mock_get_collection):
+    """Successful local Chroma retrieval is formatted into numbered snippets and sources."""
+    mock_get_collection.return_value = MagicMock()
+    mock_get_client.return_value = MagicMock()
+    mock_query_notes.return_value = {
+        "ids": ["doc_1_chunk_0", "doc_2_chunk_1"],
+        "texts": [
+            "Harshu AI OS uses OmniRoute for gateway routing.",
+            "ChromaDB handles persistent local vector indexing.",
+        ],
+        "distances": [0.12, 0.25],
+        "metadatas": [
+            {"source": "architecture.md", "position": 0},
+            {"source": "rag_design.md", "position": 1},
+        ],
+    }
+
+    result = rag_lookup("OmniRoute architecture")
+
+    assert "[1] architecture.md: Harshu AI OS uses OmniRoute for gateway routing." in result["content"]
+    assert "[2] rag_design.md: ChromaDB handles persistent local vector indexing." in result["content"]
+    assert len(result["sources"]) == 2
+    assert result["sources"][0]["title"] == "architecture.md"
+    assert result["sources"][0]["url"] == ""
+    assert result["sources"][1]["title"] == "rag_design.md"
+    assert result["sources"][1]["url"] == ""
+    assert result["query"] == "OmniRoute architecture"
+
+
+@patch("harshu_ai_os.llm.tools.get_notes_collection")
+@patch("harshu_ai_os.llm.tools.get_embedding_client")
+@patch("harshu_ai_os.llm.tools.query_notes")
+def test_rag_lookup_no_matching_notes(mock_query_notes, mock_get_client, mock_get_collection):
+    """Empty results return a clear fallback message."""
+    mock_get_collection.return_value = MagicMock()
+    mock_get_client.return_value = MagicMock()
+    mock_query_notes.return_value = {
+        "ids": [],
+        "texts": [],
+        "distances": [],
+        "metadatas": [],
+    }
+
+    result = rag_lookup("Nonexistent topic")
+    assert result["content"] == "No local knowledge base results found."
+    assert result["sources"] == []
+    assert result["query"] == "Nonexistent topic"
+
+
+@patch("harshu_ai_os.llm.tools.get_notes_collection")
+@patch("harshu_ai_os.llm.tools.get_embedding_client")
+@patch("harshu_ai_os.llm.tools.query_notes")
+def test_rag_lookup_exception_handled(mock_query_notes, mock_get_client, mock_get_collection):
+    """Chroma or embedding errors return a safe error message without crashing."""
+    mock_get_collection.return_value = MagicMock()
+    mock_get_client.return_value = MagicMock()
+    mock_query_notes.side_effect = Exception("Chroma index unavailable")
+
+    result = rag_lookup("Harshu AI OS")
+    assert "RAG lookup failed: Chroma index unavailable" in result["content"]
+    assert result["sources"] == []
+    assert result["query"] == "Harshu AI OS"
+
+
+def test_available_tools_mapping():
+    """Verify available tools dictionary has both web_search and rag_lookup."""
+    assert "web_search" in AVAILABLE_TOOLS
+    assert "rag_lookup" in AVAILABLE_TOOLS
+    assert AVAILABLE_TOOLS["web_search"] == web_search
+    assert AVAILABLE_TOOLS["rag_lookup"] == rag_lookup
+    assert RAG_LOOKUP_TOOL_SCHEMA["function"]["name"] == "rag_lookup"
+
 
 

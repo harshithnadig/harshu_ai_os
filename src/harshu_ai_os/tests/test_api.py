@@ -222,7 +222,9 @@ def test_ask_agent_endpoint_success(monkeypatch):
     def fake_run_agent_loop(route: dict, user_prompt: str, tools: list, available_tools: dict, **kwargs):
         assert route["model"] == "openai/harshu-general"
         assert user_prompt == "What is Python 3.14?"
-        assert len(tools) == 1
+        assert len(tools) == 2
+        tool_names = [t["function"]["name"] for t in tools]
+        assert tool_names == ["web_search", "rag_lookup"]
         return {
             "answer": "Python 3.14 was released with template strings and performance updates.",
             "steps_taken": 2,

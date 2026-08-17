@@ -14,11 +14,15 @@ from harshu_ai_os.api.schemas import (
     AskRequest,
     AskResponse,
 )
+from harshu_ai_os.core import get_logger
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import LLMServiceError
-from harshu_ai_os.llm.router import classify_task_with_model, choose_route
-from harshu_ai_os.llm.tools import AVAILABLE_TOOLS, WEB_SEARCH_TOOL_SCHEMA
-from harshu_ai_os.core import get_logger
+from harshu_ai_os.llm.router import choose_route, classify_task_with_model
+from harshu_ai_os.llm.tools import (
+    AVAILABLE_TOOLS,
+    RAG_LOOKUP_TOOL_SCHEMA,
+    WEB_SEARCH_TOOL_SCHEMA,
+)
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
 from harshu_ai_os.rag.service import (
@@ -155,7 +159,7 @@ def ask_agent(request: AskRequest):
         result = run_agent_loop(
             route=route,
             user_prompt=request.question,
-            tools=[WEB_SEARCH_TOOL_SCHEMA],
+            tools=[WEB_SEARCH_TOOL_SCHEMA, RAG_LOOKUP_TOOL_SCHEMA],
             available_tools=AVAILABLE_TOOLS,
         )
 
