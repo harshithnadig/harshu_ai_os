@@ -65,12 +65,13 @@ def upsert_chunk_records(collection, client, records):
         ids.append(record["id"])
         documents.append(record["text"])
         embeddings.append(embed_text(client, record["text"]))
-        metadatas.append(
-            {
-                "source": record["source"],
-                "chunk_index": record["chunk_index"],
-            }
-        )
+        metadata = {
+            "source": record["source"],
+            "chunk_index": record["chunk_index"],
+        }
+        if "doc_hash" in record:
+            metadata["doc_hash"] = record["doc_hash"]
+        metadatas.append(metadata)
 
     collection.upsert(
         ids=ids,
@@ -80,3 +81,4 @@ def upsert_chunk_records(collection, client, records):
     )
 
     return ids
+
