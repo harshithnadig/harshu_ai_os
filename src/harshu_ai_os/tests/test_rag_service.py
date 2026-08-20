@@ -522,3 +522,264 @@ def test_grounded_generation_translates_provider_errors(monkeypatch) -> None:
             "What does ChromaDB do?",
             "ChromaDB stores embeddings.",
         )
+
+
+class MultiCandidateCollection:
+    def query(self, query_embeddings, n_results):
+        assert n_results == 4
+        return {
+            "ids": [["chunk-1", "chunk-2", "chunk-3", "chunk-4"]],
+            "documents": [
+                [
+                    "Text 1 (low rerank score)",
+                    "Text 2 (top rerank score)",
+                    "Text 3 (lowest rerank score)",
+                    "Text 4 (second rerank score)",
+                ]
+            ],
+            "distances": [[0.1, 0.4, 0.2, 0.3]],
+            "metadatas": [
+                [
+                    {"source": "doc1", "chunk_index": 0},
+                    {"source": "doc2", "chunk_index": 1},
+                    {"source": "doc3", "chunk_index": 2},
+                    {"source": "doc4", "chunk_index": 3},
+                ]
+            ],
+        }
+
+
+def test_answer_with_chroma_rag_with_reranking_reorders_and_limits_chunks(
+    monkeypatch,
+):
+    collection = MultiCandidateCollection()
+    client = FakeClient()
+    route = {"model": "fake/model", "max_tokens": 100}
+
+    # Mock reranker to return chunks reordered by relevance score (top_k=2 -> chunk-2, chunk-4)
+    def fake_rerank(question, candidates, top_k=5, model_name=None):
+        assert question == "How is Harshu AI OS tested?"
+        assert top_k == 2
+        assert len(candidates["ids"]) == 4
+        return {
+            "ids": ["chunk-2", "chunk-4"],
+            "texts": [
+                "Text 2 (top rerank score)",
+                "Text 4 (second rerank score)",
+            ],
+            "distances": [0.4, 0.3],
+            "metadatas": [
+                {"source": "doc2", "chunk_index": 1},
+                {"source": "doc4", "chunk_index": 3},
+            ],
+            "reranker_scores": [0.95, 0.85],
+        }
+
+    def fake_judge(route, question, chunks, chunk_ids):
+        assert chunk_ids == ["chunk-2", "chunk-4"]
+        assert chunks == [
+            "Text 2 (top rerank score)",
+            "Text 4 (second rerank score)",
+        ]
+        return SufficiencyVerdict(
+            answerable=True,
+            reason="Chunk 2 directly answers.",
+            supporting_chunk_ids=["chunk-2"],
+        )
+
+    def fake_generate(route, question, context):
+        assert context == "Text 2 (top rerank score)"
+        return "Answer based on chunk 2."
+
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.rerank_candidates",
+        fake_rerank,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.judge_context_sufficiency",
+        fake_judge,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.generate_grounded_answer",
+        fake_generate,
+    )
+
+    result = answer_with_chroma_rag(
+        collection,
+        client,
+        "How is Harshu AI OS tested?",
+        route,
+        maximum_distance=0.5,
+        enable_reranking=True,
+        candidate_top_k=4,
+        top_k=2,
+    )
+
+    assert result["answer"] == "Answer based on chunk 2."
+    assert result["abstained"] is False
+    assert result["ids"] == ["chunk-2", "chunk-4"]
+    assert result["distances"] == [0.4, 0.3]
+    assert result["reranker_scores"] == [0.95, 0.85]
+    assert result["context"] == "Text 2 (top rerank score)"
+    # Citation must only contain the supporting chunk (chunk-2)
+    assert len(result["citations"]) == 1
+    assert result["citations"][0]["chunk_id"] == "chunk-2"
+    assert result["citations"][0]["distance"] == 0.4
+    assert result["citations"][0]["source"] == "doc2"
+
+
+def test_answer_with_chroma_rag_reranking_disabled_by_default(monkeypatch):
+    collection = FakeCollection()
+    client = FakeClient()
+    route = {"model": "fake/model", "max_tokens": 100}
+
+    def failing_rerank(*args, **kwargs):
+        raise AssertionError("Reranker must not be called when enable_reranking is False")
+
+    def fake_judge(route, question, chunks, chunk_ids):
+        return SufficiencyVerdict(
+            answerable=True,
+            reason="Supported",
+            supporting_chunk_ids=["note-1"],
+        )
+
+    def fake_generate(route, question, context):
+        return "Harshu AI OS is tested using Pytest."
+
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.rerank_candidates",
+        failing_rerank,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.judge_context_sufficiency",
+        fake_judge,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.generate_grounded_answer",
+        fake_generate,
+    )
+
+    result = answer_with_chroma_rag(
+        collection,
+        client,
+        "How is Harshu AI OS tested?",
+        route,
+        maximum_distance=0.5,
+    )
+
+    assert result["answer"] == "Harshu AI OS is tested using Pytest."
+    assert result["ids"] == ["note-1", "note-0"]
+    assert "reranker_scores" not in result
+
+
+def test_answer_with_chroma_rag_reranking_fallback_on_failure(monkeypatch):
+    collection = MultiCandidateCollection()
+    client = FakeClient()
+    route = {"model": "fake/model", "max_tokens": 100}
+
+    def failing_rerank(*args, **kwargs):
+        raise RuntimeError("Reranking is optional. Install it with: uv sync --extra reranking")
+
+    def fake_judge(route, question, chunks, chunk_ids):
+        # Fallback should pass top_k=2 Chroma chunks (chunk-1, chunk-2)
+        assert chunk_ids == ["chunk-1", "chunk-2"]
+        return SufficiencyVerdict(
+            answerable=True,
+            reason="Supported by fallback top chunks.",
+            supporting_chunk_ids=["chunk-1"],
+        )
+
+    def fake_generate(route, question, context):
+        return "Fallback answer."
+
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.rerank_candidates",
+        failing_rerank,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.judge_context_sufficiency",
+        fake_judge,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.generate_grounded_answer",
+        fake_generate,
+    )
+
+    result = answer_with_chroma_rag(
+        collection,
+        client,
+        "How is Harshu AI OS tested?",
+        route,
+        maximum_distance=0.5,
+        enable_reranking=True,
+        candidate_top_k=4,
+        top_k=2,
+    )
+
+    assert result["answer"] == "Fallback answer."
+    assert result["abstained"] is False
+    assert result["ids"] == ["chunk-1", "chunk-2"]
+    assert result["distances"] == [0.1, 0.4]
+    assert len(result["citations"]) == 1
+    assert result["citations"][0]["chunk_id"] == "chunk-1"
+
+
+def test_answer_with_chroma_rag_end_to_end_with_mocked_cross_encoder(monkeypatch):
+    """Test full integration path using real rerank_candidates with mocked model."""
+    from unittest.mock import MagicMock
+
+    collection = MultiCandidateCollection()
+    client = FakeClient()
+    route = {"model": "fake/model", "max_tokens": 100}
+
+    mock_model = MagicMock()
+    # 4 candidates: chunk-1 (0.2), chunk-2 (0.95), chunk-3 (0.1), chunk-4 (0.8)
+    mock_model.predict.return_value = [0.2, 0.95, 0.1, 0.8]
+
+    def fake_judge(route, question, chunks, chunk_ids):
+        assert chunk_ids == ["chunk-2", "chunk-4"]
+        return SufficiencyVerdict(
+            answerable=True,
+            reason="Supported by chunk-2",
+            supporting_chunk_ids=["chunk-2"],
+        )
+
+    def fake_generate(route, question, context):
+        assert context == "Text 2 (top rerank score)"
+        return "Grounded answer from reranked chunk 2."
+
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.reranker.get_reranker_model",
+        lambda *args, **kwargs: mock_model,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.judge_context_sufficiency",
+        fake_judge,
+    )
+    monkeypatch.setattr(
+        "harshu_ai_os.rag.service.generate_grounded_answer",
+        fake_generate,
+    )
+
+    result = answer_with_chroma_rag(
+        collection,
+        client,
+        "How is Harshu AI OS tested?",
+        route,
+        maximum_distance=0.5,
+        enable_reranking=True,
+        candidate_top_k=4,
+        top_k=2,
+    )
+
+    assert result["answer"] == "Grounded answer from reranked chunk 2."
+    assert result["abstained"] is False
+    assert result["ids"] == ["chunk-2", "chunk-4"]
+    assert result["distances"] == [0.4, 0.3]
+    assert result["reranker_scores"] == [0.95, 0.8]
+    assert len(result["citations"]) == 1
+    assert result["citations"][0]["chunk_id"] == "chunk-2"
+    assert result["citations"][0]["distance"] == 0.4
+    assert result["citations"][0]["source"] == "doc2"
+
+

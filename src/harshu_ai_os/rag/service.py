@@ -13,16 +13,21 @@ from time import perf_counter
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
+from harshu_ai_os.core import get_logger
 from harshu_ai_os.llm.client import create_chat_model_from_route
 from harshu_ai_os.llm.exceptions import LLMServiceError
-from harshu_ai_os.rag.chroma_store import query_notes
+from harshu_ai_os.rag.chroma_store import DEFAULT_TOP_K, query_notes
+from harshu_ai_os.rag.reranker import rerank_candidates
 from harshu_ai_os.rag.sufficiency_judge import judge_context_sufficiency
 
+
+logger = get_logger(__name__)
 
 # Chroma cosine distance is smaller when two embeddings are more similar.
 # This starting threshold must be tuned with real evaluation cases, not guessed.
 DEFAULT_MAXIMUM_DISTANCE = 0.5
 ABSTENTION_ANSWER = "I do not have enough information."
+DEFAULT_CANDIDATE_TOP_K = 10
 
 
 def create_grounded_chat_prompt() -> ChatPromptTemplate:
@@ -117,7 +122,7 @@ def build_rag_result(
     total_ms: float,
 ) -> dict:
     """Build the response once so every RAG exit uses the same fields."""
-    return {
+    result = {
         "answer": answer,
         "abstained": abstained,
         "abstention_reason": "insufficient_context" if abstained else None,
@@ -133,6 +138,9 @@ def build_rag_result(
         "generation_ms": generation_ms,
         "total_ms": total_ms,
     }
+    if "reranker_scores" in retrieval:
+        result["reranker_scores"] = retrieval["reranker_scores"]
+    return result
 
 
 def answer_with_chroma_rag(
@@ -141,6 +149,9 @@ def answer_with_chroma_rag(
     question: str,
     route: dict,
     maximum_distance: float = DEFAULT_MAXIMUM_DISTANCE,
+    enable_reranking: bool = False,
+    candidate_top_k: int = DEFAULT_CANDIDATE_TOP_K,
+    top_k: int = DEFAULT_TOP_K,
 ) -> dict:
     """Run the complete RAG path while keeping each decision visible."""
     if not question.strip():
@@ -150,8 +161,30 @@ def answer_with_chroma_rag(
 
     # Step 1: retrieve candidate evidence from Chroma.
     retrieval_started_at = perf_counter()
-    retrieval = query_notes(collection, client, question)
+    if enable_reranking:
+        retrieval = query_notes(collection, client, question, top_k=candidate_top_k)
+    elif top_k != DEFAULT_TOP_K:
+        retrieval = query_notes(collection, client, question, top_k=top_k)
+    else:
+        retrieval = query_notes(collection, client, question)
     retrieval_ms = elapsed_ms(retrieval_started_at)
+
+    # Optional second-stage reranking: score question/chunk pairs and keep top_k.
+    if enable_reranking:
+        try:
+            retrieval = rerank_candidates(question, retrieval, top_k=top_k)
+        except Exception as error:
+            logger.warning(
+                "Reranking failed (%s); falling back to Chroma retrieval order.",
+                error,
+            )
+            retrieval = {
+                "ids": retrieval["ids"][:top_k],
+                "texts": retrieval["texts"][:top_k],
+                "distances": retrieval["distances"][:top_k],
+                "metadatas": retrieval["metadatas"][:top_k],
+            }
+
     all_context = "\n\n".join(retrieval["texts"])
 
     # Step 2: use the cheap distance gate before spending another model call.
