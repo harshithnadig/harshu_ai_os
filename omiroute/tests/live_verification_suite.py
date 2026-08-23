@@ -1,17 +1,25 @@
 """Live end-to-end verification suite for the OmniRoute gateway."""
 
 import json
+import os
 import time
 import httpx
 
 GATEWAY_URL = "http://127.0.0.1:20128"
 V1_URL = f"{GATEWAY_URL}/v1"
-API_KEY = ""  # removed leaked credential
 
-HEADERS = {
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json",
-}
+def _required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"{name} is required for the live verification suite")
+    return value
+
+
+def _auth_headers() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {_required_env('OMNIROUTE_API_KEY')}",
+        "Content-Type": "application/json",
+    }
 
 
 def test_step_5_live_chat():
@@ -24,7 +32,9 @@ def test_step_5_live_chat():
         "temperature": 0.0,
     }
     t0 = time.perf_counter()
-    r = httpx.post(f"{V1_URL}/chat/completions", headers=HEADERS, json=payload, timeout=20.0)
+    r = httpx.post(
+        f"{V1_URL}/chat/completions", headers=_auth_headers(), json=payload, timeout=20.0
+    )
     latency_ms = (time.perf_counter() - t0) * 1000.0
 
     assert r.status_code == 200, f"Chat failed with HTTP {r.status_code}: {r.text}"
@@ -64,7 +74,9 @@ def test_step_6_live_classifier():
         "response_format": {"type": "json_object"},
     }
     t0 = time.perf_counter()
-    r = httpx.post(f"{V1_URL}/chat/completions", headers=HEADERS, json=payload, timeout=20.0)
+    r = httpx.post(
+        f"{V1_URL}/chat/completions", headers=_auth_headers(), json=payload, timeout=20.0
+    )
     latency_ms = (time.perf_counter() - t0) * 1000.0
 
     assert r.status_code == 200, f"Classifier failed with HTTP {r.status_code}: {r.text}"
@@ -112,7 +124,9 @@ def test_step_7_live_judge():
         "response_format": {"type": "json_object"},
     }
     t0 = time.perf_counter()
-    r = httpx.post(f"{V1_URL}/chat/completions", headers=HEADERS, json=payload, timeout=20.0)
+    r = httpx.post(
+        f"{V1_URL}/chat/completions", headers=_auth_headers(), json=payload, timeout=20.0
+    )
     latency_ms = (time.perf_counter() - t0) * 1000.0
 
     assert r.status_code == 200, f"Judge failed with HTTP {r.status_code}: {r.text}"
@@ -173,7 +187,9 @@ def test_step_8_live_tool_calling():
         "temperature": 0.0,
     }
     t0 = time.perf_counter()
-    r_a = httpx.post(f"{V1_URL}/chat/completions", headers=HEADERS, json=payload_a, timeout=20.0)
+    r_a = httpx.post(
+        f"{V1_URL}/chat/completions", headers=_auth_headers(), json=payload_a, timeout=20.0
+    )
     latency_a = (time.perf_counter() - t0) * 1000.0
 
     assert r_a.status_code == 200, f"Tool step A failed with HTTP {r_a.status_code}: {r_a.text}"
@@ -210,7 +226,9 @@ def test_step_8_live_tool_calling():
         "temperature": 0.0,
     }
     t1 = time.perf_counter()
-    r_b = httpx.post(f"{V1_URL}/chat/completions", headers=HEADERS, json=payload_b, timeout=20.0)
+    r_b = httpx.post(
+        f"{V1_URL}/chat/completions", headers=_auth_headers(), json=payload_b, timeout=20.0
+    )
     latency_b = (time.perf_counter() - t1) * 1000.0
 
     assert r_b.status_code == 200, f"Tool step B failed with HTTP {r_b.status_code}: {r_b.text}"
@@ -237,7 +255,10 @@ def test_step_10_and_15_live_memory():
     print("STEP 10 & 15: REAL MEMORY LIFECYCLE (STORE, RETRIEVE, PERSISTENCE, DELETE)")
     print("=" * 60)
     client = httpx.Client(timeout=15.0)
-    client.post(f"{GATEWAY_URL}/api/auth/login", json={"password": "CHANGEME"})
+    client.post(
+        f"{GATEWAY_URL}/api/auth/login",
+        json={"password": _required_env("OMNIROUTE_INITIAL_PASSWORD")},
+    )
 
     # 1. Store synthetic memory
     stored_text = "Harshu prefers PUBG examples when learning programming."
