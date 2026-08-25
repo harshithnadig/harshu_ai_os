@@ -122,35 +122,96 @@ Interactive FastAPI documentation is available at:
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
 
-## Running with Docker
+## Running with Docker and Docker Compose
 
-You can build and run the Harshu AI OS FastAPI backend in a reproducible Docker container.
+You can run Harshu AI OS locally using standalone Docker or multi-service orchestration with Docker Compose.
 
-### Build the Docker image
+### Option A: Docker Compose (Recommended)
+
+Docker Compose provides a local production-style environment with automatic volume persistence, internal network isolation, container health checks, and declarative environment variable management.
+
+#### 1. Start the services
+Start the container in the background (detached mode) with build on launch:
+
+```bash
+docker compose up -d --build
+```
+
+Or run interactively in the foreground to stream logs directly to your terminal:
+
+```bash
+docker compose up
+```
+
+#### 2. Check service status
+Inspect the state and health of running Compose services:
+
+```bash
+docker compose ps
+```
+
+View live real-time service logs:
+
+```bash
+docker compose logs -f app
+```
+
+#### 3. Access API and Health endpoint
+Verify the FastAPI backend is healthy:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+```json
+{"status":"healthy"}
+```
+
+Access the interactive API docs at `http://localhost:8000/docs`.
+
+#### 4. Stop the services
+Stop and remove containers and internal networks while preserving persistent volumes:
+
+```bash
+docker compose down
+```
+
+To remove containers and volumes completely:
+
+```bash
+docker compose down -v
+```
+
+---
+
+### Option B: Standalone Docker
+
+#### 1. Build the Docker image
 
 ```bash
 docker build -t harshu-ai-os .
 ```
 
-### Run the container
+#### 2. Run the container
 
 Run the container using your local `.env` file for configuration:
 
 ```bash
-docker run -p 8000:8000 --env-file .env harshu-ai-os
+docker run -p 8000:8000 -v "${PWD}/data:/app/data" --env-file .env harshu-ai-os
 ```
 
 Or pass individual environment variables:
 
 ```bash
-docker run -p 8000:8000 \
+docker run -p 8000:8000 -v "${PWD}/data:/app/data" \
   -e HARSHU_AI_OS_MODE=development \
   -e GEMINI_API_KEY=your_gemini_key \
   -e GROQ_API_KEY=your_groq_key \
   harshu-ai-os
 ```
 
-### Verify the container
+#### 3. Verify the container
 
 Test the health endpoint:
 
@@ -162,6 +223,15 @@ Expected response:
 ```json
 {"status":"healthy"}
 ```
+
+---
+
+### Container Architecture & Persistence
+
+- **Embedded ChromaDB:** Chroma runs directly inside the FastAPI application process using `chromadb.PersistentClient(path="data/chroma")`. There is no separate Chroma database service required, which minimizes memory overhead and network latency for single-instance deployments.
+- **Data Persistence:** The host directory `./data` is mounted to `/app/data` inside the container. This guarantees that vector embeddings, chunk collections, and SQLite indexes created during document ingestion survive container restarts and rebuilds.
+- **Networking & DNS:** Docker Compose establishes an isolated user-defined bridge network (`harshu-network`). Containers on this network can communicate using their service names as hostnames (e.g. `http://app:8000`). Within containers, `localhost` refers only to that individual container's network namespace; inter-container communication relies on Compose service names resolved by Docker's built-in DNS.
+
 
 ## Frontend setup
 
