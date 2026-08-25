@@ -40,3 +40,5 @@ models/
 omiroute/upstream/
 omiroute/.env
 .run/
+.playwright-mcp/
+scratch/

@@ -1,0 +1,40 @@
+# Version control
+.git/
+.gitignore
+
+# Virtual environment and Python caches
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+omiroute/.env
+
+# Local persistent data and vector database
+data/
+
+# Frontend and Node dependencies
+frontend/
+node_modules/
+
+# Notebooks and documentation
+jupyter/
+docs/
+revision/
+
+# IDE, agent memory, and temporary scratch files
+.kilo/
+.agent_memory/
+.playwright-mcp/
+.run/
+scratch/
+gpu_scripts/
+models/

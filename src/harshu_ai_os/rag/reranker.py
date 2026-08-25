@@ -10,7 +10,7 @@ simpler Chroma retrieval path in ``rag/service.py``.
 from functools import lru_cache
 from typing import Any
 
-DEFAULT_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L6-v2"
+DEFAULT_MODEL_NAME = "Alibaba-NLP/gte-reranker-modernbert-base"
 RESULT_FIELDS = ("ids", "texts", "distances", "metadatas")
 
 
@@ -29,7 +29,13 @@ def get_reranker_model(model_name: str = DEFAULT_MODEL_NAME) -> Any:
             "Reranking is optional. Install it with: uv sync --extra reranking"
         ) from error
 
-    return CrossEncoder(model_name)
+    import torch
+    
+    kwargs = {"trust_remote_code": True}
+    if torch.cuda.is_available():
+        kwargs["model_kwargs"] = {"torch_dtype": torch.float16}
+        
+    return CrossEncoder(model_name, **kwargs)
 
 
 def rerank_candidates(
@@ -55,7 +61,7 @@ def rerank_candidates(
         raise ValueError("Candidate fields must contain the same number of items.")
 
     pairs = [(question, text) for text in columns["texts"]]
-    raw_scores = get_reranker_model(model_name).predict(pairs)
+    raw_scores = get_reranker_model(model_name).predict(pairs, batch_size=8)
     scores = raw_scores.tolist() if hasattr(raw_scores, "tolist") else list(raw_scores)
 
     if len(scores) != len(columns["texts"]):

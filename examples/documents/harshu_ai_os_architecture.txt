@@ -1,0 +1,37 @@
+# System Overview & Core Principles
+Harshu AI OS is an experimental AI application that coordinates planning, routing, tool usage, and retrieval-augmented generation. The system exposes FastAPI endpoints and uses Pydantic schemas for request validation, structured output validation, and configuration handling. It emphasizes deterministic execution boundaries, explicit failure handling, and strict evidence grounding.
+
+# Request Planning & 3-Way Orchestration Workflow
+Incoming user prompts are analyzed by the query planner using the harshu-classifier model to generate a structured RequestPlan. The plan categorizes the request by complexity (simple, general, or complex), information source (none, web, internal, or mixed), and a boolean flag strict_internal_grounding. The unified orchestrator deterministically dispatches the request to one of three workflows:
+1. direct: Standard language model generation for queries where information_source is none.
+2. agent: Bounded ReAct agent loop for queries where information_source is web, internal, or mixed. For mixed queries, dual-tool execution with rag_lookup and web_search is required before final synthesis.
+3. strict_rag: Deterministic grounded retrieval workflow invoked when strict_internal_grounding is true.
+
+# Bounded ReAct Agent Loop & Tool Subsystem
+The agent subsystem executes an iterative DECIDE, ACT, OBSERVE, SYNTHESIZE, STOP cycle governed by an explicit step budget constraint of max_steps=3. Tools are executed through a safe boundary function that parses arguments and catches runtime errors. The available tools are:
+- rag_lookup: Searches Harshu AI OS internal indexed project documents in ChromaDB.
+- web_search: Queries live external web data for current information and verification.
+The agent collects source citations, records step history, and terminates with reasons such as direct_answer, completed, or max_steps_exceeded.
+
+# Strict RAG Pipeline, Sufficiency Judge & Citations
+The strict RAG workflow enforces a multi-stage gated pipeline:
+1. Retrieval: Retrieves top candidate chunks from ChromaDB using vector similarity.
+2. Distance Gating: Evaluates cosine distances against a threshold (maximum distance 0.5) and abstains early if candidate chunks are too distant.
+3. Sufficiency Judging: Evaluates context with the harshu-judge model to determine whether retrieved passages answer the full question. If unanswerable, the system returns the standard abstention message: "I do not have enough information."
+4. Grounded Generation and Citations: Generates answers strictly from verified supporting chunks and produces structured citations referencing chunk IDs, source names, and similarity distances.
+
+# OmniRoute Gateway & Logical Model Roles
+All model requests pass through the local OmniRoute gateway, which abstracts physical model providers into logical model roles:
+- harshu-classifier: Structured JSON query classification and routing decisions.
+- harshu-judge: Context sufficiency evaluation and verdict scoring for RAG retrieval.
+- harshu-general: General conversational responses and direct answers with standard token limits.
+- harshu-reasoning: Complex reasoning, architecture evaluation, and multi-step planning (max tokens 2000). Handles complex reasoning in Harshu AI OS.
+- harshu-tools: Function calling and tool decision execution.
+- harshu-embedding: 3072-dimensional vector embedding generation with a strict NO_CROSS_MODEL_FALLBACK policy to protect vector space geometry in ChromaDB.
+
+# Chroma Vector Storage & Knowledge Sync Lifecycle
+ChromaDB provides persistent local vector storage with cosine distance indexing. The Knowledge Sync subsystem keeps vector collections aligned with local project documents:
+- Content Hashing: Calculates deterministic SHA-256 hashes for source documents.
+- Change Detection: Inspects indexed metadata and skips unchanged documents without calling embedding models.
+- Atomic Chunk Replacement: Deletes all prior chunks for modified documents before inserting fresh chunks, preventing ghost chunks when documents shrink.
+- Orphan Cleanup: Automatically purges Chroma chunks belonging to source documents that were deleted from disk.

@@ -50,7 +50,7 @@ def arena_upsert(collection, records: List[Dict[str, Any]], batch_size: int = 50
         print(f"      Embedded and inserted {min(i + batch_size, len(records))}/{len(records)} chunks...")
 
 
-def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = False, bm25_index=None, bm25_doc_ids=None) -> List[Dict[str, Any]]:
+def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = False, bm25_index=None, bm25_doc_ids=None, chunk_lookup=None) -> List[Dict[str, Any]]:
     if use_reranker:
         from harshu_ai_os.rag.reranker import rerank_candidates, get_reranker_model
         print("   Warming up CrossEncoder reranker...")
@@ -114,6 +114,10 @@ def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = Fal
         bm25_top_k = bm25_top_50[:top_k] if bm25_top_50 else []
         hybrid_top_k = hybrid_top_50[:top_k] if hybrid_top_50 else []
         
+        hybrid_rerank_latency = 0.0
+        hybrid_reranked_top_k = []
+        hybrid_union_ids = []
+        
         if use_reranker and retrieved_texts:
             candidates = {
                 "ids": retrieved_ids,
@@ -125,6 +129,20 @@ def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = Fal
             ranked = rerank_candidates(q.question, candidates, top_k=top_k)
             rerank_latency = time.perf_counter() - start_rerank
             reranked_top_k = ranked["ids"]
+            
+            if bm25_index is not None and chunk_lookup:
+                hybrid_union_ids = list(dict.fromkeys(retrieved_ids + bm25_top_50))
+                h_cands = {"ids": [], "texts": [], "distances": [], "metadatas": []}
+                for cid in hybrid_union_ids:
+                    h_cands["ids"].append(cid)
+                    h_cands["texts"].append(chunk_lookup[cid]["text"])
+                    h_cands["distances"].append(0.0)
+                    h_cands["metadatas"].append({})
+                    
+                start_h_rerank = time.perf_counter()
+                h_ranked = rerank_candidates(q.question, h_cands, top_k=top_k)
+                hybrid_rerank_latency = time.perf_counter() - start_h_rerank
+                hybrid_reranked_top_k = h_ranked["ids"]
         
         # Determine error states
         def get_error_type(eval_ids, top_50_ids):
@@ -150,6 +168,7 @@ def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = Fal
         rerank_error = get_error_type(reranked_top_k, retrieved_ids) if use_reranker else None
         bm25_error = get_error_type(bm25_top_k, bm25_top_50) if bm25_index else None
         hybrid_error = get_error_type(hybrid_top_k, hybrid_top_50) if bm25_index else None
+        hybrid_rerank_error = get_error_type(hybrid_reranked_top_k, hybrid_union_ids) if (bm25_index is not None and use_reranker) else None
         
         results.append({
             "id": q.id,
@@ -160,14 +179,17 @@ def evaluate_arena(collection, queries, top_k: int = 5, use_reranker: bool = Fal
             "rerank_latency": rerank_latency,
             "bm25_latency": bm25_latency,
             "hybrid_latency": dense_latency + bm25_latency + hybrid_latency,
+            "hybrid_rerank_latency": hybrid_rerank_latency,
             "dense_ids": dense_top_k,
             "rerank_ids": reranked_top_k,
             "bm25_ids": bm25_top_k,
             "hybrid_ids": hybrid_top_k,
+            "hybrid_rerank_ids": hybrid_reranked_top_k,
             "dense_error": dense_error,
             "rerank_error": rerank_error,
             "bm25_error": bm25_error,
             "hybrid_error": hybrid_error,
+            "hybrid_rerank_error": hybrid_rerank_error,
             "retrieved_50_ids": retrieved_ids,
             "expected_facts_to_chunks": q.expected_facts_to_chunks
         })
@@ -252,9 +274,21 @@ def print_arena_metrics(results: List[Dict[str, Any]], use_reranker: bool, use_h
     if use_hybrid:
         bm25_metrics = compute_metrics(results, "bm25_ids")
         hybrid_metrics = compute_metrics(results, "hybrid_ids")
+    if use_hybrid and use_reranker:
+        hybrid_rerank_metrics = compute_metrics(results, "hybrid_rerank_ids")
     
     print("\n--- RETRIEVAL METRICS ---")
-    if use_hybrid:
+    if use_hybrid and use_reranker:
+        print(f"{'Metric':<25} | {'Dense Top-5':<15} | {'BM25 Top-5':<15} | {'Hybrid Top-5':<15} | {'Dense+GTE':<15} | {'Hybrid+GTE':<15}")
+        print("-" * 110)
+        print(f"{'Hit@1':<25} | {dense_metrics['hit1']:<14.2f}% | {bm25_metrics['hit1']:<14.2f}% | {hybrid_metrics['hit1']:<14.2f}% | {rerank_metrics['hit1']:<14.2f}% | {hybrid_rerank_metrics['hit1']:<14.2f}%")
+        print(f"{'Hit@3':<25} | {dense_metrics['hit3']:<14.2f}% | {bm25_metrics['hit3']:<14.2f}% | {hybrid_metrics['hit3']:<14.2f}% | {rerank_metrics['hit3']:<14.2f}% | {hybrid_rerank_metrics['hit3']:<14.2f}%")
+        print(f"{'Hit@5':<25} | {dense_metrics['hit5']:<14.2f}% | {bm25_metrics['hit5']:<14.2f}% | {hybrid_metrics['hit5']:<14.2f}% | {rerank_metrics['hit5']:<14.2f}% | {hybrid_rerank_metrics['hit5']:<14.2f}%")
+        print(f"{'AllEvidence@5':<25} | {dense_metrics['all_ev_5']:<14.2f}% | {bm25_metrics['all_ev_5']:<14.2f}% | {hybrid_metrics['all_ev_5']:<14.2f}% | {rerank_metrics['all_ev_5']:<14.2f}% | {hybrid_rerank_metrics['all_ev_5']:<14.2f}%")
+        print(f"{'MRR':<25} | {dense_metrics['mrr']:<15.4f} | {bm25_metrics['mrr']:<15.4f} | {hybrid_metrics['mrr']:<15.4f} | {rerank_metrics['mrr']:<15.4f} | {hybrid_rerank_metrics['mrr']:<15.4f}")
+        print(f"{'Context Precision@5':<25} | {dense_metrics['p5']:<15.4f} | {bm25_metrics['p5']:<15.4f} | {hybrid_metrics['p5']:<15.4f} | {rerank_metrics['p5']:<15.4f} | {hybrid_rerank_metrics['p5']:<15.4f}")
+        print(f"{'Fact Recall@5':<25} | {dense_metrics['fact_r5']:<15.4f} | {bm25_metrics['fact_r5']:<15.4f} | {hybrid_metrics['fact_r5']:<15.4f} | {rerank_metrics['fact_r5']:<15.4f} | {hybrid_rerank_metrics['fact_r5']:<15.4f}")
+    elif use_hybrid:
         print(f"{'Metric':<25} | {'Dense Top-5':<15} | {'BM25 Top-5':<15} | {'Hybrid Top-5':<15}")
         print("-" * 75)
         print(f"{'Hit@1':<25} | {dense_metrics['hit1']:<14.2f}% | {bm25_metrics['hit1']:<14.2f}% | {hybrid_metrics['hit1']:<14.2f}%")
@@ -283,7 +317,12 @@ def print_arena_metrics(results: List[Dict[str, Any]], use_reranker: bool, use_h
         print(f"Fact Recall@5           : {dense_metrics['fact_r5']:.4f}")
 
     if use_hybrid or use_reranker:
-        target_error = "hybrid_error" if use_hybrid else "rerank_error"
+        if use_hybrid and use_reranker:
+            target_error = "hybrid_rerank_error"
+        elif use_hybrid:
+            target_error = "hybrid_error"
+        else:
+            target_error = "rerank_error"
         rescued_rank = 0
         rescued_miss = 0
         regressions = 0
@@ -393,12 +432,24 @@ def print_arena_metrics(results: List[Dict[str, Any]], use_reranker: bool, use_h
         p95_t = tot_lats[int((total - 1) * 0.95)]
         p99_t = tot_lats[int((total - 1) * 0.99)]
         
-        print("\n--- STEADY-STATE LATENCY ---")
-        print(f"{'Percentile':<12} | {'Dense Top-50':<15} | {'BM25 Top-50':<15} | {'Hybrid Total Path':<15}")
-        print("-" * 65)
-        print(f"{'p50':<12} | {p50_d:<14.4f}s | {p50_b:<14.4f}s | {p50_t:<14.4f}s")
-        print(f"{'p95':<12} | {p95_d:<14.4f}s | {p95_b:<14.4f}s | {p95_t:<14.4f}s")
-        print(f"{'p99':<12} | {p99_d:<14.4f}s | {p99_b:<14.4f}s | {p99_t:<14.4f}s")
+        if use_reranker:
+            hr_lats = sorted([r["hybrid_latency"] + r["hybrid_rerank_latency"] for r in results])
+            p50_hr = hr_lats[int((total - 1) * 0.50)]
+            p95_hr = hr_lats[int((total - 1) * 0.95)]
+            p99_hr = hr_lats[int((total - 1) * 0.99)]
+            print("\n--- STEADY-STATE LATENCY ---")
+            print(f"{'Percentile':<12} | {'Dense Top-50':<15} | {'BM25 Top-50':<15} | {'Hybrid Path':<15} | {'Hybrid+GTE Path':<15}")
+            print("-" * 85)
+            print(f"{'p50':<12} | {p50_d:<14.4f}s | {p50_b:<14.4f}s | {p50_t:<14.4f}s | {p50_hr:<14.4f}s")
+            print(f"{'p95':<12} | {p95_d:<14.4f}s | {p95_b:<14.4f}s | {p95_t:<14.4f}s | {p95_hr:<14.4f}s")
+            print(f"{'p99':<12} | {p99_d:<14.4f}s | {p99_b:<14.4f}s | {p99_t:<14.4f}s | {p99_hr:<14.4f}s")
+        else:
+            print("\n--- STEADY-STATE LATENCY ---")
+            print(f"{'Percentile':<12} | {'Dense Top-50':<15} | {'BM25 Top-50':<15} | {'Hybrid Total Path':<15}")
+            print("-" * 65)
+            print(f"{'p50':<12} | {p50_d:<14.4f}s | {p50_b:<14.4f}s | {p50_t:<14.4f}s")
+            print(f"{'p95':<12} | {p95_d:<14.4f}s | {p95_b:<14.4f}s | {p95_t:<14.4f}s")
+            print(f"{'p99':<12} | {p99_d:<14.4f}s | {p99_b:<14.4f}s | {p99_t:<14.4f}s")
     elif use_reranker:
         rr_lats = sorted([r["rerank_latency"] for r in results])
         p50_r = rr_lats[int((total - 1) * 0.50)]
@@ -464,9 +515,15 @@ def main():
         
     print(f"   Ingestion complete. Process Memory: {get_memory_usage()}")
     
-    print("5. Running retrieval evaluation...")
-    results = evaluate_arena(collection, active_queries, top_k=5, use_reranker=args.rerank, bm25_index=bm25_index, bm25_doc_ids=bm25_doc_ids)
+    chunk_lookup = {r["id"]: r for r in records}
     
+    print("5. Running retrieval evaluation...")
+    results = evaluate_arena(collection, active_queries, top_k=5, use_reranker=args.rerank, bm25_index=bm25_index, bm25_doc_ids=bm25_doc_ids, chunk_lookup=chunk_lookup)
+    
+    import torch
+    if torch.cuda.is_available():
+        print(f"\nCUDA Peak Memory: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
+        
     print_arena_metrics(results, args.rerank, args.hybrid)
     
 if __name__ == "__main__":

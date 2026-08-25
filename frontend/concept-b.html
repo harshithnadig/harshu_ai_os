@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concept B — Neural Circuit | Harshu AI OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg-pcb: #020306;
+        --color-amber: #f59e0b;
+        --color-amber-glow: rgba(245, 158, 11, 0.4);
+        --color-cyan: #06b6d4;
+        --color-cyan-glow: rgba(6, 182, 212, 0.4);
+        --color-emerald: #10b981;
+        --text-pure: #ffffff;
+        --text-main: #cbd5e1;
+        --text-dim: #475569;
+        --font-sans: 'Space Grotesk', sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+      }
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-pcb);
+        color: var(--text-main);
+        min-height: 100vh;
+        overflow-x: hidden;
+        position: relative;
+        background-image: 
+          radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px),
+          radial-gradient(rgba(6, 182, 212, 0.08) 1px, transparent 1px),
+          linear-gradient(180deg, #020306 0%, #060913 100%);
+        background-size: 32px 32px, 64px 64px, 100% 100%;
+        background-position: 0 0, 16px 16px, 0 0;
+      }
+      .circuit-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .app-shell {
+        position: relative;
+        z-index: 2;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      /* Top Hardware PCB Header */
+      .pcb-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: rgba(6, 9, 16, 0.9);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        border-radius: 6px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(245, 158, 11, 0.03);
+      }
+      .pcb-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pcb-chip-icon {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        color: var(--color-amber);
+        border: 1px solid var(--color-amber);
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(245, 158, 11, 0.1);
+      }
+      .pcb-title {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        color: var(--text-pure);
+      }
+      .pcb-tagline {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: var(--color-amber);
+      }
+      .pcb-status-cluster {
+        display: flex;
+        gap: 12px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+      .pcb-stat {
+        color: var(--text-dim);
+      }
+      .pcb-stat strong {
+        color: var(--color-cyan);
+      }
+      .pcb-stat strong.amber {
+        color: var(--color-amber);
+      }
+
+      /* Neural Circuit Matrix Hero Deck */
+      .circuit-deck {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* Massive Interactive Neural Circuit Topology Board */
+      .neural-topology-board {
+        background: rgba(4, 7, 14, 0.95);
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        border-radius: 12px;
+        padding: 20px 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(6, 182, 212, 0.03);
+        position: relative;
+        overflow: hidden;
+      }
+      .board-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+      }
+      .board-title {
+        color: var(--color-cyan);
+        font-weight: 700;
+      }
+
+      /* Integrated Command Deck Inside Circuit */
+      .circuit-interactive-zone {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .integrated-prompt-deck {
+        background: rgba(10, 15, 26, 0.8);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .integrated-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .circuit-modes {
+        display: flex;
+        gap: 4px;
+        background: rgba(2, 3, 6, 0.8);
+        padding: 3px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .circuit-mode-btn {
+        padding: 4px 10px;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        color: var(--text-dim);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .circuit-mode-btn.active {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--color-amber);
+        border: 1px solid var(--color-amber);
+      }
+      .prompt-box {
+        background: rgba(2, 3, 6, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .prompt-box textarea {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text-pure);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        line-height: 1.5;
+        min-height: 70px;
+        resize: vertical;
+      }
+      .prompt-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .circuit-fire-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--color-amber);
+        color: #020306;
+        border: none;
+        padding: 8px 18px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        box-shadow: 0 0 16px var(--color-amber-glow);
+      }
+
+      /* Live Hardware Bus SVG Layout */
+      .circuit-bus-map {
+        position: relative;
+        width: 100%;
+        height: 220px;
+      }
+
+      /* Bottom Circuit Telemetry Bar */
+      .circuit-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: rgba(6, 9, 16, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top PCB Navigation Header -->
+      <header class="pcb-header">
+        <div class="pcb-brand">
+          <span class="pcb-chip-icon">µCPU</span>
+          <div>
+            <div class="pcb-title">HARSHU AI OS</div>
+            <div class="pcb-tagline">NEURAL CIRCUIT RUNTIME // OMNIROUTE BUS</div>
+          </div>
+        </div>
+
+        <div class="pcb-status-cluster">
+          <div class="pcb-stat">BUS: <strong class="amber">ONLINE (100%)</strong></div>
+          <div class="pcb-stat">STORE: <strong>CHROMADB READY</strong></div>
+          <div class="pcb-stat">INSPECTOR: <strong>[⌥I]</strong></div>
+        </div>
+      </header>
+
+      <!-- Main Neural Circuit Board -->
+      <main class="neural-topology-board">
+        <div class="board-header">
+          <span class="board-title">INTELLIGENCE CIRCUIT BUS TOPOLOGY</span>
+          <span style="color:var(--color-amber);">CIRCUIT STATE: ARMED FOR ROUTING</span>
+        </div>
+
+        <div class="circuit-interactive-zone">
+          <!-- Left: Integrated Command Node -->
+          <div class="integrated-prompt-deck">
+            <div class="integrated-top">
+              <span style="font-family:var(--font-mono); font-size:10px; color:var(--color-amber); font-weight:700;">PROMPT INJECTION NODE</span>
+              <div class="circuit-modes">
+                <button class="circuit-mode-btn active">01 NORMAL</button>
+                <button class="circuit-mode-btn">02 RAG</button>
+                <button class="circuit-mode-btn" disabled style="opacity:0.4;">03 AGENT</button>
+              </div>
+            </div>
+
+            <div class="prompt-box">
+              <textarea placeholder="Enter command or query to pulse through the neural circuit..."></textarea>
+            </div>
+
+            <div class="prompt-bottom">
+              <span style="font-family:var(--font-mono); font-size:9px; color:var(--text-dim);">ROUTE: AUTO_CLASSIFY // OMNIROUTE</span>
+              <button class="circuit-fire-btn">PULSE CIRCUIT ➔</button>
+            </div>
+          </div>
+
+          <!-- Right: Interactive SVG Live Circuit -->
+          <div class="circuit-bus-map">
+            <svg viewBox="0 0 440 220" fill="none" style="width:100%; height:100%;">
+              <!-- Copper Circuit Lines -->
+              <path d="M40 110 L120 110 L160 60 L240 60" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4 3" />
+              <path d="M40 110 L120 110 L160 160 L240 160" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3" />
+              <path d="M240 60 L340 60" stroke="#06b6d4" stroke-width="2" />
+              <path d="M240 160 L310 160 L350 160" stroke="#f59e0b" stroke-width="2" />
+              <path d="M350 160 L410 160" stroke="#10b981" stroke-width="2" stroke-dasharray="3 3" />
+
+              <!-- User Injection Point -->
+              <circle cx="40" cy="110" r="8" fill="#020306" stroke="#ffffff" stroke-width="2" />
+              <text x="40" y="132" text-anchor="middle" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="8px" font-weight="700">INPUT</text>
+
+              <!-- Classifier Hub -->
+              <rect x="100" y="98" width="40" height="24" rx="4" fill="#08101e" stroke="#06b6d4" stroke-width="1.5" />
+              <text x="120" y="113" text-anchor="middle" fill="#06b6d4" font-family="'JetBrains Mono', monospace" font-size="7px" font-weight="700">CLASSIFY</text>
+
+              <!-- Web Tool Node -->
+              <circle cx="240" cy="60" r="14" fill="#03151e" stroke="#06b6d4" stroke-width="2" />
+              <circle cx="240" cy="60" r="4" fill="#06b6d4" />
+              <text x="240" y="86" text-anchor="middle" fill="#06b6d4" font-family="'JetBrains Mono', monospace" font-size="8px" font-weight="700">WEB TOOL</text>
+              <text x="240" y="96" text-anchor="middle" fill="#475569" font-family="'JetBrains Mono', monospace" font-size="7px">DDGS</text>
+
+              <!-- RAG Store Node -->
+              <circle cx="240" cy="160" r="14" fill="#1c1204" stroke="#f59e0b" stroke-width="2" />
+              <circle cx="240" cy="160" r="4" fill="#f59e0b" />
+              <text x="240" y="186" text-anchor="middle" fill="#f59e0b" font-family="'JetBrains Mono', monospace" font-size="8px" font-weight="700">RAG STORE</text>
+              <text x="240" y="196" text-anchor="middle" fill="#475569" font-family="'JetBrains Mono', monospace" font-size="7px">ChromaDB</text>
+
+              <!-- Judge Verifier -->
+              <rect x="290" y="148" width="44" height="24" rx="4" fill="#1f1807" stroke="#f59e0b" stroke-width="1.5" />
+              <text x="312" y="163" text-anchor="middle" fill="#f59e0b" font-family="'JetBrains Mono', monospace" font-size="7px" font-weight="700">JUDGE</text>
+
+              <!-- Output Node -->
+              <circle cx="410" cy="160" r="12" fill="#041a12" stroke="#10b981" stroke-width="2" />
+              <circle cx="410" cy="160" r="4" fill="#10b981" />
+              <text x="410" y="186" text-anchor="middle" fill="#10b981" font-family="'JetBrains Mono', monospace" font-size="8px" font-weight="700">GROUNDED</text>
+            </svg>
+          </div>
+        </div>
+      </main>
+
+      <!-- Bottom Hardware Telemetry Pulse -->
+      <footer class="circuit-footer">
+        <div>● CIRCUIT VOLTAGE: NOMINAL · OMNIROUTE ROLE: HARSHU-GENERAL</div>
+        <div>HARSHU AI OS // CONCEPT B: NEURAL CIRCUIT</div>
+      </footer>
+    </div>
+  </body>
+</html>

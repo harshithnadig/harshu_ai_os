@@ -5,8 +5,12 @@ import os
 import time
 import httpx
 
-GATEWAY_URL = "http://127.0.0.1:20128"
+import os
+from pathlib import Path
+
+GATEWAY_URL = os.environ.get("OMNIROUTE_GATEWAY_URL", "http://127.0.0.1:20128")
 V1_URL = f"{GATEWAY_URL}/v1"
+
 
 def _required_env(name: str) -> str:
     value = os.getenv(name, "").strip()

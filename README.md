@@ -122,6 +122,47 @@ Interactive FastAPI documentation is available at:
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
 
+## Running with Docker
+
+You can build and run the Harshu AI OS FastAPI backend in a reproducible Docker container.
+
+### Build the Docker image
+
+```bash
+docker build -t harshu-ai-os .
+```
+
+### Run the container
+
+Run the container using your local `.env` file for configuration:
+
+```bash
+docker run -p 8000:8000 --env-file .env harshu-ai-os
+```
+
+Or pass individual environment variables:
+
+```bash
+docker run -p 8000:8000 \
+  -e HARSHU_AI_OS_MODE=development \
+  -e GEMINI_API_KEY=your_gemini_key \
+  -e GROQ_API_KEY=your_groq_key \
+  harshu-ai-os
+```
+
+### Verify the container
+
+Test the health endpoint:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+```json
+{"status":"healthy"}
+```
+
 ## Frontend setup
 
 In a second terminal:
