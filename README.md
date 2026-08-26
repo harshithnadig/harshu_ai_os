@@ -232,6 +232,53 @@ Expected response:
 - **Data Persistence:** The host directory `./data` is mounted to `/app/data` inside the container. This guarantees that vector embeddings, chunk collections, and SQLite indexes created during document ingestion survive container restarts and rebuilds.
 - **Networking & DNS:** Docker Compose establishes an isolated user-defined bridge network (`harshu-network`). Containers on this network can communicate using their service names as hostnames (e.g. `http://app:8000`). Within containers, `localhost` refers only to that individual container's network namespace; inter-container communication relies on Compose service names resolved by Docker's built-in DNS.
 
+---
+
+## Container Image Registry (GHCR)
+
+The Harshu AI OS container image is automatically built, tested, and published to the **GitHub Container Registry (GHCR)** on every push to `main` via the automated CI/CD workflow.
+
+### Registry Location
+```text
+ghcr.io/harshithnadig/harshu_ai_os
+```
+
+### Pulling the Image
+
+To pull the latest release image:
+
+```bash
+docker pull ghcr.io/harshithnadig/harshu_ai_os:latest
+```
+
+To pull a specific immutable commit build (recommended for deterministic production deployments and rollbacks):
+
+```bash
+docker pull ghcr.io/harshithnadig/harshu_ai_os:sha-<commit_sha>
+```
+
+### Running the Pulled Image
+
+Run the container using your local persistent data volume and environment file:
+
+```bash
+docker run -d \
+  --name harshu-ai-os \
+  -p 8000:8000 \
+  -v "${PWD}/data:/app/data" \
+  --env-file .env \
+  ghcr.io/harshithnadig/harshu_ai_os:latest
+```
+
+### Tagging & Rollback Strategy
+
+| Tag Format | Example | Mutability | Intended Use Case |
+| :--- | :--- | :--- | :--- |
+| `latest` | `ghcr.io/harshithnadig/harshu_ai_os:latest` | Mutable | Local development and default pulling of the latest `main` build. |
+| `<branch>` | `ghcr.io/harshithnadig/harshu_ai_os:main` | Mutable | Tracking the head of a specific branch. |
+| `sha-<commit_sha>` | `ghcr.io/harshithnadig/harshu_ai_os:sha-dde3db1` | **Immutable** | **Production deployments & rollback target.** Pinned directly to the git commit SHA. |
+
+
 
 ## Frontend setup
 
