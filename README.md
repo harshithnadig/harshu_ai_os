@@ -278,7 +278,20 @@ docker run -d \
 | `<branch>` | `ghcr.io/harshithnadig/harshu_ai_os:main` | Mutable | Tracking the head of a specific branch. |
 | `sha-<commit_sha>` | `ghcr.io/harshithnadig/harshu_ai_os:sha-dde3db1` | **Immutable** | **Production deployments & rollback target.** Pinned directly to the git commit SHA. |
 
+### Local Deployment Simulation
 
+Harshu AI OS includes an automated local deployment script (`scripts/deploy_local.ps1`) to simulate production-style zero-downtime-conscious release workflows on a local workstation without requiring paid cloud infrastructure.
+
+- **Why Immutable SHA Tags:** Deployments strictly reject `latest` and require immutable commit tags (e.g. `sha-3d4f8eb`). This guarantees that the exact binary artifact tested in CI is deployed without risk of tag drift or cache pollution.
+- **Deploy Command:**
+  ```powershell
+  .\scripts\deploy_local.ps1 -ImageTag sha-3d4f8eb
+  ```
+- **Health Verification:** After container instantiation, the deployment script executes bounded polling against `http://localhost:8000/health` requiring HTTP 200 and `{"status":"healthy"}` before marking deployment as successful.
+- **Automatic Rollback:** If the candidate image fails to start or fails the health check within the timeout window, the script automatically terminates the candidate, restores the previously running container version with identical environment and volume bindings, and verifies health of the restored service.
+- **Scope & Limitations:** This is a **local production simulation** running a single standalone container bound to local host ports and `./data` storage. It does not replace cloud-native production architectures (such as Kubernetes orchestrators, multi-replica horizontal autoscaling, external managed vector databases, or global load balancers).
+
+---
 
 ## Frontend setup
 
