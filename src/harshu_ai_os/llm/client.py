@@ -16,6 +16,8 @@ from litellm import completion
 from litellm.exceptions import (
     APIConnectionError,
     AuthenticationError,
+    BadRequestError,
+    PermissionDeniedError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
@@ -30,6 +32,8 @@ from tenacity import (
 from harshu_ai_os.core import get_logger, get_omniroute_config
 from harshu_ai_os.llm.exceptions import (
     LLMAuthenticationError,
+    LLMBadRequestError,
+    LLMPermissionError,
     LLMRateLimitError,
     LLMServiceError,
     LLMTimeoutError,
@@ -37,13 +41,20 @@ from harshu_ai_os.llm.exceptions import (
 
 logger = get_logger(__name__)
 
-# Transient errors that qualify for bounded retries with exponential backoff
+# Transient errors that qualify for bounded retries and fallback
 TRANSIENT_LLM_ERRORS = (
     ServiceUnavailableError,
     RateLimitError,
     APIConnectionError,
     Timeout,
     TimeoutError,
+)
+
+# Permanent errors that must NOT be retried or trigger fallback
+PERMANENT_LLM_ERRORS = (
+    AuthenticationError,
+    PermissionDeniedError,
+    BadRequestError,
 )
 
 # Routes intentionally contain provider-specific controls. LiteLLM drops only
@@ -121,7 +132,7 @@ def call_llm(
 
         try:
             response = make_llm_call(completion_args)
-        except Exception as primary_error:
+        except TRANSIENT_LLM_ERRORS as primary_error:
             fallback_model = route.get("fallback_model")
             if fallback_model and fallback_model != route.get("model") and not tools:
                 logger.warning(
@@ -242,6 +253,10 @@ def call_llm(
 
     except AuthenticationError as exc:
         raise LLMAuthenticationError("AI service authentication failed.") from exc
+    except PermissionDeniedError as exc:
+        raise LLMPermissionError("AI service access denied.") from exc
+    except BadRequestError as exc:
+        raise LLMBadRequestError("AI service rejected invalid request parameters.") from exc
     except (Timeout, TimeoutError) as exc:
         raise LLMTimeoutError("AI service request timed out.") from exc
     except RateLimitError as exc:

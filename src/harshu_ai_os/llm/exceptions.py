@@ -15,3 +15,11 @@ class LLMRateLimitError(LLMServiceError):
 
 class LLMAuthenticationError(LLMServiceError):
     """Raised when an LLM provider rejects authentication credentials."""
+
+
+class LLMPermissionError(LLMServiceError):
+    """Raised when an LLM provider rejects access permissions."""
+
+
+class LLMBadRequestError(LLMServiceError):
+    """Raised when an LLM provider rejects a request due to invalid client parameters."""
