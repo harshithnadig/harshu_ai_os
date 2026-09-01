@@ -4,8 +4,10 @@ This file validates requests and exposes unified and diagnostic API endpoints;
 planning, retrieval, and provider details remain in their owning modules.
 """
 
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from harshu_ai_os.api.security import check_rate_limit, verify_api_key
 
 from harshu_ai_os.agents.loop import run_agent_loop
 from harshu_ai_os.api.schemas import (
@@ -34,12 +36,23 @@ from harshu_ai_os.rag.service import (
 app = FastAPI()
 logger = get_logger(__name__)
 
-# The standalone Vite client is only used during local development.
+# Configure CORS with explicit origins and no credential leakage
+cors_origins_env = os.getenv("HARSHU_CORS_ORIGINS")
+allowed_origins = [
+    origin.strip()
+    for origin in (
+        cors_origins_env.split(",")
+        if cors_origins_env
+        else ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 app.add_middleware(ObservabilityMiddleware)
@@ -51,13 +64,32 @@ def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/ready")
+def readiness_check():
+    """Readiness probe verifying vector store and critical configuration."""
+    checks: dict[str, str] = {}
+    try:
+        collection = get_notes_collection()
+        checks["chroma_store"] = "ok"
+    except Exception as exc:
+        checks["chroma_store"] = f"unhealthy: {type(exc).__name__}"
+
+    all_healthy = all(status == "ok" for status in checks.values())
+    if not all_healthy:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+    return {"status": "ready", "checks": checks}
+
+
 def choose_request_route(question: str):
     """Classify one question and return the matching provider route."""
     classification = classify_task_with_model(question)
     return classification, choose_route(classification.complexity)
 
 
-@app.post("/ask", response_model=AskResponse)
+@app.post("/ask", response_model=AskResponse, dependencies=[Depends(verify_api_key), Depends(check_rate_limit)])
 def ask(request: AskRequest):
     """Handle unified request orchestration (Direct, Agent, or Strict RAG)."""
     try:
@@ -100,7 +132,7 @@ def ask(request: AskRequest):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@app.post("/ask/rag", response_model=AskRagResponse)
+@app.post("/ask/rag", response_model=AskRagResponse, dependencies=[Depends(verify_api_key), Depends(check_rate_limit)])
 def ask_rag(request: AskRequest):
     """Handle grounded answers and return the retrieval evidence to the UI."""
     try:
@@ -157,7 +189,7 @@ def ask_rag(request: AskRequest):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@app.post("/ask/agent", response_model=AskAgentResponse)
+@app.post("/ask/agent", response_model=AskAgentResponse, dependencies=[Depends(verify_api_key), Depends(check_rate_limit)])
 def ask_agent(request: AskRequest):
     """Handle bounded ReAct multi-step agent queries."""
     try:

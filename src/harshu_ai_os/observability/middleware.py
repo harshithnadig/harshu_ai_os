@@ -53,6 +53,44 @@ class ObservabilityMiddleware:
             path=path,
         )
 
+        # Enforce maximum payload size limit (64 KB)
+        content_length: int | None = None
+        for h_name, h_val in scope.get("headers", []):
+            if h_name.lower() == b"content-length":
+                try:
+                    content_length = int(h_val.decode("latin1"))
+                except Exception:
+                    pass
+                break
+
+        if content_length is not None and content_length > 65536:
+            import json
+            resp_body = json.dumps({"detail": "Request payload too large (max 64KB)"}).encode("utf-8")
+            await send({
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(resp_body)).encode("latin1")),
+                    (b"x-request-id", request_id.encode("latin1")),
+                ],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": resp_body,
+            })
+            log_event(
+                "INFO",
+                "http_request_completed",
+                request_id=request_id,
+                method=method,
+                path=path,
+                status_code=413,
+                duration_ms=0.0,
+            )
+            reset_request_id(token)
+            return
+
         async def send_wrapper(message: Message) -> None:
             nonlocal status_code
             if message["type"] == "http.response.start":

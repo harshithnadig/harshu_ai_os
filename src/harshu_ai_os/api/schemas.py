@@ -5,10 +5,13 @@ from typing import Any
 from pydantic import BaseModel
 
 
+from pydantic import Field
+
+
 class AskRequest(BaseModel):
     """The only user input accepted by answer endpoints."""
 
-    question: str
+    question: str = Field(..., max_length=4000)
 
 
 class WebSource(BaseModel):
