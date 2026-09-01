@@ -97,6 +97,14 @@ def execute_single_tool(
     else:
         args = {}
 
+    if not isinstance(args, dict):
+        return f"Error: Tool arguments must be a dictionary for '{func_name}'.", []
+
+    # Bound string arguments to prevent payload bloat
+    for k, v in list(args.items()):
+        if isinstance(v, str) and len(v) > 2000:
+            args[k] = v[:2000]
+
     # 2. Execute Python Tool
     tool_func = available_tools[func_name]
     try:
@@ -154,6 +162,7 @@ def run_agent_loop(
     step_history = []
     executed_tool_names: set[str] = set()
     required_tool_set = set(required_tools) if required_tools else set()
+    last_tool_call_signature: str | None = None
 
     while steps_taken < max_steps:
         missing_required = required_tool_set - executed_tool_names
@@ -226,10 +235,22 @@ def run_agent_loop(
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 args_raw = tool_call.function.arguments
-                observation, sources = execute_single_tool(
-                    function_name, args_raw, available_tools
-                )
-                if not observation.startswith("Error: Tool '"):
+                call_sig = f"{function_name}:{args_raw}"
+
+                # Repeated-call guard: break consecutive identical tool invocations
+                if call_sig == last_tool_call_signature:
+                    observation = (
+                        f"Notice: Tool '{function_name}' was already executed with identical arguments. "
+                        f"Please synthesize your answer with available evidence or try a different approach."
+                    )
+                    sources = []
+                else:
+                    observation, sources = execute_single_tool(
+                        function_name, args_raw, available_tools
+                    )
+                    last_tool_call_signature = call_sig
+
+                if not observation.startswith("Error: Tool '") and not observation.startswith("Notice:"):
                     executed_tool_names.add(function_name)
 
                 messages.append(

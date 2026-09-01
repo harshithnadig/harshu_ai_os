@@ -363,3 +363,35 @@ def test_agent_loop_unauthorized_tool_handled_safely(mock_make_call):
     messages = second_call_args["messages"]
     tool_msg = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"][0]
     assert "Error: Tool 'delete_all_files' is not allowed" in tool_msg["content"]
+
+
+
+@patch("harshu_ai_os.agents.loop.make_llm_call")
+def test_agent_loop_repeated_call_guard(mock_make_call):
+    """Verify consecutive identical tool calls trigger loop breaker notice."""
+    call1 = _make_mock_tool_call("c1", "web_search", '{"query": "python version"}')
+    call2_identical = _make_mock_tool_call("c2", "web_search", '{"query": "python version"}')
+    final_resp = _make_mock_response(content="Answered after loop break.")
+
+    mock_make_call.side_effect = [
+        _make_mock_response(content=None, tool_calls=[call1]),
+        _make_mock_response(content=None, tool_calls=[call2_identical]),
+        final_resp,
+    ]
+
+    fake_tools = {"web_search": lambda query: {"content": "Python 3.12", "sources": []}}
+    route = {"model": "openai/harshu-tools", "max_tokens": 500}
+
+    result = run_agent_loop(
+        route=route,
+        user_prompt="Find python version",
+        tools=[WEB_SEARCH_TOOL_SCHEMA],
+        available_tools=fake_tools,
+        max_steps=5,
+    )
+
+    third_call_args = mock_make_call.call_args_list[2][0][0]
+    messages = third_call_args["messages"]
+    tool_msgs = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"]
+    assert len(tool_msgs) == 2
+    assert "Notice: Tool 'web_search' was already executed with identical arguments" in tool_msgs[1]["content"]
