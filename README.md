@@ -8,20 +8,36 @@ Harshu AI OS is a learning-first AI engineering project with a FastAPI backend a
 
 The project demonstrates request planning, model routing, local ChromaDB vector retrieval, sufficiency judging, bounded ReAct agent loops with multi-tool execution (`web_search` and `rag_lookup`), and structured citations.
 
-## Current features
+## Current features (Harshu AI OS V1)
 
-- Unified question endpoint through `POST /ask` with automated planning and workflow dispatch
-- Diagnostic development endpoints `POST /ask/rag` and `POST /ask/agent`
-- Automatic question complexity and information requirement classification via `RequestPlan`
-- Deterministic workflow selection:
-  - **DIRECT:** Fast language model synthesis for ordinary knowledge questions
-  - **AGENT:** Bounded ReAct agent loop supporting `web_search` and `rag_lookup` with deterministic multi-domain coverage guards
-  - **STRICT_RAG:** Grounded RAG with ChromaDB retrieval, cosine distance gating, LLM sufficiency judge, supporting chunks, and citation/abstention guarantees
-- Local ChromaDB vector storage and embeddings routed through the OmniRoute logical embedding role
-- Responsive desktop and mobile interface with telemetry inspector drawer
-- Friendly loading, backend, and network states
-- FastAPI request and response validation with Pydantic
-- Automated backend and unit test suites
+- **Unified Request Orchestration:** Single entrypoint `POST /ask` with automated complexity classification and workflow routing (`DIRECT`, `AGENT`, `STRICT_RAG`).
+- **Security Baseline & Abuse Protection:**
+  - Constant-time API key auth (`X-API-Key` or `Authorization: Bearer`) via `hmac.compare_digest` with dev-mode fallback.
+  - Deterministic sliding-window rate limiting (60 req/min per client IP) with HTTP 429 and `Retry-After` headers.
+  - Strict 64KB request body payload limit enforced at pure ASGI middleware level (HTTP 413).
+  - Question length validation capped at 4,000 characters (HTTP 422).
+  - Configurable dynamic CORS allowlisting via `HARSHU_CORS_ORIGINS`.
+- **Reliability & LLM Provider Hardening:**
+  - Bounded exponential retries (up to 3 attempts) for transient errors (503, 429, timeouts, network drops).
+  - Zero duplicate retries on permanent client/auth errors (400, 401, 403) with fail-closed domain error mapping (`LLMAuthenticationError`, `LLMTimeoutError`, `LLMRateLimitError`, `LLMServiceError`).
+  - Automatic fallback route invocation when primary model is degraded.
+- **AI-Specific Telemetry & Observability:**
+  - Request-level correlation IDs (`X-Request-ID`) via Python `contextvars`.
+  - Single-line JSON structured logs tracking workflow type, model role, complexity, stage latencies (`retrieval_ms`, `judge_ms`, `generation_ms`), tool calls count, and abstention status.
+  - Strict privacy guarantees: zero raw user prompt, model response, or API secret leakage in lifecycle logs.
+- **Agent & Tool Safety Guardrails:**
+  - Explicit function dispatch allowlist (`AVAILABLE_TOOLS`) with bounded execution (`DEFAULT_MAX_STEPS = 5`).
+  - Parameter bounds validation and consecutive repeated-call loop breaker notice.
+  - Strict prohibition of arbitrary shell, OS command, or unconstrained filesystem execution.
+- **Model Context Protocol (MCP) v1:**
+  - Minimal, safe, read-only MCP JSON-RPC 2.0 server (`initialize`, `tools/list`, `tools/call`) exposing `rag_lookup` and `system_status`.
+- **Health & Readiness Architecture:**
+  - Liveness probe `GET /health`: ultra-fast, zero-dependency process heartbeat (HTTP 200).
+  - Readiness probe `GET /ready`: dependency verification checking local ChromaDB vector store health (HTTP 200 or 503).
+- **Deployment & Automated Rollback:**
+  - Cross-platform local production simulation (`scripts/deploy_local.sh` and `scripts/deploy_local.ps1`).
+  - Tag vs cryptographically pinned image digest verification.
+  - Automated health polling and immediate container rollback on deployment failures.
 
 ## Request flow
 
@@ -356,7 +372,58 @@ npm run lint
 npm run build
 ```
 
-## Current limitations
+## Security Baseline & Abuse Protection
+
+Harshu AI OS enforces defense-in-depth protections across the request lifecycle:
+
+1. **API Key Authentication (`api/security.py`):**
+   - Configured via environment variable `HARSHU_API_KEY`.
+   - Supports `X-API-Key: <key>` and `Authorization: Bearer <key>`.
+   - Uses constant-time string comparison (`hmac.compare_digest`) to resist timing attacks.
+   - When `HARSHU_API_KEY` is unset or empty, the server operates in development mode (fail-open for local DX). When set, all non-exempt endpoints strictly require authentication (HTTP 401).
+2. **Deterministic Sliding-Window Rate Limiter:**
+   - Thread-safe in-memory rate limiter tracking client IP addresses across a rolling 60-second window.
+   - Default threshold: 60 requests/minute. Rejections return HTTP 429 with standard `Retry-After: <seconds>` header.
+3. **Payload & Input Size Constraints:**
+   - Pure ASGI middleware check rejecting any incoming request payload exceeding 64 KB (65,536 bytes) with HTTP 413 before parsing JSON or allocating memory.
+   - Pydantic schema validation restricting question inputs to `max_length=4000` (HTTP 422).
+4. **CORS Control:**
+   - Configurable via `HARSHU_CORS_ORIGINS` (comma-delimited), defaulting to local web dev ports (`localhost:5173`, `127.0.0.1:5173`).
+
+---
+
+## Model Context Protocol (MCP) v1
+
+Harshu AI OS includes a safe, read-only Model Context Protocol (MCP) server adapter conforming to the official specification (`PROTOCOL_VERSION = "2024-11-05"`):
+
+- **Protocol:** Standard JSON-RPC 2.0 messages.
+- **Capabilities:**
+  - `initialize`: Returns server info and tool capabilities.
+  - `tools/list`: Lists available tools (`rag_lookup`, `system_status`) with JSON Schema input definitions.
+  - `tools/call`: Executes allowlisted read-only tools, returning formatted `{"content": [{"type": "text", "text": "..."}]}` results.
+- **Safety Guarantee:** MCP integration is strictly read-only. Unlisted tools (e.g. shell execution, arbitrary file writes) are safely rejected with `isError: true` and JSON-RPC error codes.
+
+---
+
+## Architectural Decision Records (ADRs)
+
+Key architectural boundaries are documented in [`docs/architecture_decisions.md`](docs/architecture_decisions.md):
+- **ADR-001 (LangGraph Evaluation):** Deferred for V1. Pure Python bounded ReAct loops (`DEFAULT_MAX_STEPS = 5`) fulfill all current agent requirements without the graph complexity, checkpointer overhead, or latency of LangGraph.
+- **ADR-002 (Persistence & Queues):** Deferred for V1. Local persistent ChromaDB and thread-safe in-memory rate limiting satisfy single-node requirements with zero external container dependencies. External databases (Postgres/Redis/Celery) will be evaluated when distributed horizontal scaling is required.
+
+---
+
+## Current limitations & Scaling Boundaries
+
+1. **Embedded ChromaDB Scaling Boundary:**
+   - Harshu AI OS uses local persistent ChromaDB (`chromadb.PersistentClient`) with SQLite storage. SQLite has a single-writer lock; running multiple container replicas sharing the same volume will encounter SQLite locking contention.
+   - For multi-replica horizontal autoscaling in Kubernetes/Cloud Run, an external client/server vector database (such as standalone Chroma server, Qdrant, or Pinecone) is required.
+2. **Single-Node Rate Limiting:**
+   - The sliding-window rate limiter is currently in-memory. In a distributed multi-node cluster, a centralized cache (e.g., Redis) would be needed to enforce global rate limits across all nodes.
+3. **Single-Turn Memory Model:**
+   - The runtime currently handles stateless single-turn requests; multi-message session history is not persisted between requests.
+4. **Local Deployment Simulation vs Cloud Production:**
+   - `scripts/deploy_local.sh` and `scripts/deploy_local.ps1` simulate production deployment verification and rollbacks on a local single-node workstation. They do not replace managed cloud ingress, multi-region load balancers, or Kubernetes rolling update controllers.
 
 - There is no document upload endpoint; ingestion currently uses a local script.
 - Conversations and answers are not persisted between requests.
