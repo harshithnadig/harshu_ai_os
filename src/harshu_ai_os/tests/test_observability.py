@@ -360,3 +360,51 @@ def test_handled_llm_service_error_safe_structured_logging(
     # 7. Synthetic secret DOES NOT occur anywhere in captured logs
     all_logs_text = "\n".join(log_capture.formatted_lines)
     assert secret_message not in all_logs_text
+
+
+# ======================================================================
+# 13. AI-specific structured telemetry
+# ======================================================================
+
+def test_ai_workflow_telemetry_in_logs(log_capture, monkeypatch):
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {
+            "answer": "Paris is the capital of France.",
+            "complexity": "simple",
+            "workflow_used": "direct",
+            "model": "openai/harshu-general",
+            "tool_used": False,
+            "tool_calls_count": 0,
+            "tool_sources": [],
+            "citations": [],
+            "abstained": False,
+            "abstention_reason": None,
+            "judge_reason": None,
+            "tool_name": None,
+            "tool_query": None,
+            "stopped_reason": None,
+            "steps_taken": 0,
+        },
+    )
+
+    req_id = "ai-telem-test-123"
+    resp = client.post("/ask", json={"question": "Capital of France?"}, headers={"X-Request-ID": req_id})
+    assert resp.status_code == 200
+
+    matching_logs = [
+        json.loads(line)
+        for line in log_capture.formatted_lines
+        if json.loads(line).get("event") == "ai_workflow_completed"
+        and json.loads(line).get("request_id") == req_id
+    ]
+    assert len(matching_logs) == 1
+    telem = matching_logs[0]
+
+    assert telem["event"] == "ai_workflow_completed"
+    assert telem["request_id"] == req_id
+    assert telem["workflow"] == "direct"
+    assert telem["model"] == "openai/harshu-general"
+    assert telem["complexity"] == "simple"
+    assert telem["abstained"] is False
+    assert telem["tool_calls_count"] == 0

@@ -95,10 +95,17 @@ def ask(request: AskRequest):
     try:
         result = execute_request(request.question)
         logger.info(
-            "ask_workflow=%s model=%s complexity=%s",
-            result.get("workflow_used"),
-            result.get("model"),
-            result.get("complexity"),
+            "ai_workflow_completed",
+            extra={
+                "event": "ai_workflow_completed",
+                "workflow": result.get("workflow_used", "direct"),
+                "model": result.get("model", ""),
+                "complexity": result.get("complexity", "general"),
+                "tool_calls_count": result.get("tool_calls_count", 0),
+                "tool_name": result.get("tool_name"),
+                "abstained": result.get("abstained", False),
+                "abstention_reason": result.get("abstention_reason"),
+            },
         )
         return {
             "answer": result.get("answer", ""),
@@ -150,9 +157,18 @@ def ask_rag(request: AskRequest):
         )
 
         logger.info(
-            "rag_model=%s retrieved_ids=%s",
-            route["model"],
-            result["ids"],
+            "ai_workflow_completed",
+            extra={
+                "event": "ai_workflow_completed",
+                "workflow": "strict_rag",
+                "model": route["model"],
+                "complexity": classification.complexity,
+                "retrieval_ms": result.get("retrieval_ms", 0.0),
+                "judge_ms": result.get("judge_ms", 0.0),
+                "generation_ms": result.get("generation_ms", 0.0),
+                "abstained": result.get("abstained", False),
+                "abstention_reason": result.get("abstention_reason"),
+            },
         )
 
         return {
@@ -203,9 +219,15 @@ def ask_agent(request: AskRequest):
         )
 
         logger.info(
-            "agent_model=%s steps=%s",
-            route["model"],
-            result.get("steps_taken", 0),
+            "ai_workflow_completed",
+            extra={
+                "event": "ai_workflow_completed",
+                "workflow": "agent",
+                "model": route["model"],
+                "complexity": classification.complexity,
+                "tool_calls_count": result.get("tool_calls_count", 0),
+                "tool_used": result.get("tool_used", False),
+            },
         )
 
         return {

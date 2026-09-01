@@ -27,8 +27,29 @@ class StructuredJsonFormatter(logging.Formatter):
         if req_id is not None:
             data["request_id"] = req_id
 
-        # Standard structured metadata
-        for field in ("method", "path", "status_code", "duration_ms", "error_type"):
+        # Standard and AI-specific structured metadata
+        telemetry_fields = (
+            "method",
+            "path",
+            "status_code",
+            "duration_ms",
+            "error_type",
+            "workflow",
+            "model",
+            "complexity",
+            "tool_calls_count",
+            "tool_name",
+            "abstained",
+            "abstention_reason",
+            "retrieval_ms",
+            "judge_ms",
+            "generation_ms",
+            "fallback_used",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+        )
+        for field in telemetry_fields:
             val = getattr(record, field, None)
             if val is not None:
                 data[field] = val
