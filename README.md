@@ -30,7 +30,9 @@ The project demonstrates request planning, model routing, local ChromaDB vector 
   - Parameter bounds validation and consecutive repeated-call loop breaker notice.
   - Strict prohibition of arbitrary shell, OS command, or unconstrained filesystem execution.
 - **Model Context Protocol (MCP) v1:**
-  - Minimal, safe, read-only MCP JSON-RPC 2.0 server (`initialize`, `tools/list`, `tools/call`) exposing `rag_lookup` and `system_status`.
+  - Official Model Context Protocol SDK v2 integration conforming to the 2026-07-28 specification.
+  - Stateless discovery via `server/discover` and tool execution via `tools/call`.
+  - Exposes strictly validated, safe read-only capabilities (`rag_lookup`, `system_status`) with legacy `initialize` backward-compatibility.
 - **Health & Readiness Architecture:**
   - Liveness probe `GET /health`: ultra-fast, zero-dependency process heartbeat (HTTP 200).
   - Readiness probe `GET /ready`: dependency verification checking local ChromaDB vector store health (HTTP 200 or 503).
@@ -394,14 +396,17 @@ Harshu AI OS enforces defense-in-depth protections across the request lifecycle:
 
 ## Model Context Protocol (MCP) v1
 
-Harshu AI OS includes a safe, read-only Model Context Protocol (MCP) server adapter conforming to the official specification (`PROTOCOL_VERSION = "2024-11-05"`):
+Harshu AI OS includes a safe, read-only Model Context Protocol (MCP) server adapter conforming to the current official specification (`2026-07-28`), powered by the official Model Context Protocol Python SDK v2 (`mcp>=2.1.1`):
 
-- **Protocol:** Standard JSON-RPC 2.0 messages.
-- **Capabilities:**
-  - `initialize`: Returns server info and tool capabilities.
-  - `tools/list`: Lists available tools (`rag_lookup`, `system_status`) with JSON Schema input definitions.
-  - `tools/call`: Executes allowlisted read-only tools, returning formatted `{"content": [{"type": "text", "text": "..."}]}` results.
-- **Safety Guarantee:** MCP integration is strictly read-only. Unlisted tools (e.g. shell execution, arbitrary file writes) are safely rejected with `isError: true` and JSON-RPC error codes.
+- **Architecture:** Modern stateless protocol core removing the legacy session requirement.
+- **Protocol Discovery & Execution:**
+  - Modern clients discover server capabilities, identity, and supported versions via `server/discover`.
+  - Tools are discovered via `tools/list` and executed via `tools/call`.
+  - Backwards-compatibility: Legacy clients utilizing the older `initialize` handshake are automatically supported via the official SDK compatibility layer.
+- **Exposed Read-Only Capabilities:**
+  - `rag_lookup`: Search indexed local knowledge base. Enforces strict bounds on input types, query length (capped at 1,000 characters), and result limits ($1 \le k \le 10$).
+  - `system_status`: Inspect truthful, live component health (including actual vector store probe) and runtime capabilities without static unverified assertions.
+- **Safety Guarantee:** MCP integration is strictly read-only. Unlisted tools (shell execution, arbitrary file writes, destructive operations) are safely rejected with `is_error: true`.
 
 ---
 
