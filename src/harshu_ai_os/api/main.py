@@ -22,6 +22,7 @@ from harshu_ai_os.llm.tools import (
     RAG_LOOKUP_TOOL_SCHEMA,
     WEB_SEARCH_TOOL_SCHEMA,
 )
+from harshu_ai_os.observability import ObservabilityMiddleware
 from harshu_ai_os.orchestrator import execute_request
 from harshu_ai_os.rag.chroma_store import get_notes_collection
 from harshu_ai_os.rag.embedding_client import get_embedding_client
@@ -41,6 +42,7 @@ app.add_middleware(
     allow_methods=["POST"],
     allow_headers=["*"],
 )
+app.add_middleware(ObservabilityMiddleware)
 
 
 @app.get("/health")
@@ -84,7 +86,13 @@ def ask(request: AskRequest):
             "steps_taken": result.get("steps_taken", 0),
         }
     except LLMServiceError as error:
-        logger.error(error)
+        logger.error(
+            "llm_service_error",
+            extra={
+                "event": "llm_service_error",
+                "error_type": type(error).__name__,
+            },
+        )
         raise HTTPException(
             status_code=503, detail="AI service temporarily unavailable"
         )
@@ -134,7 +142,13 @@ def ask_rag(request: AskRequest):
         }
 
     except LLMServiceError as error:
-        logger.error(error)
+        logger.error(
+            "llm_service_error",
+            extra={
+                "event": "llm_service_error",
+                "error_type": type(error).__name__,
+            },
+        )
         raise HTTPException(
             status_code=503,
             detail="AI service temporarily unavailable",
@@ -173,7 +187,13 @@ def ask_agent(request: AskRequest):
             "tool_used": result.get("tool_used", False),
         }
     except LLMServiceError as error:
-        logger.error(error)
+        logger.error(
+            "llm_service_error",
+            extra={
+                "event": "llm_service_error",
+                "error_type": type(error).__name__,
+            },
+        )
         raise HTTPException(
             status_code=503,
             detail="AI service temporarily unavailable",

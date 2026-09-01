@@ -66,6 +66,7 @@ api/main.py
                  ├─ rag/embedding_client.py
                  └─ rag/judge.py
 
+observability/  # request IDs, contextvars, pure ASGI middleware, structured JSON logging
 core.py         # shared configuration and logging
 ```
 
@@ -276,13 +277,14 @@ docker run -d \
 | :--- | :--- | :--- | :--- |
 | `latest` | `ghcr.io/harshithnadig/harshu_ai_os:latest` | Mutable | Local development and default pulling of the latest `main` build. |
 | `<branch>` | `ghcr.io/harshithnadig/harshu_ai_os:main` | Mutable | Tracking the head of a specific branch. |
-| `sha-<commit_sha>` | `ghcr.io/harshithnadig/harshu_ai_os:sha-dde3db1` | **Immutable** | **Production deployments & rollback target.** Pinned directly to the git commit SHA. |
+| `sha-<commit_sha>` | `ghcr.io/harshithnadig/harshu_ai_os:sha-dde3db1` | Mutable Tag (CI-pinned) | Release & rollback target convention. Pinned by CI to the git commit SHA. |
+| `@sha256:<digest>` | `ghcr.io/harshithnadig/harshu_ai_os@sha256:...` | **Immutable** | **Content-addressed immutable identity.** Cryptographically pinned artifact. |
 
 ### Local Deployment Simulation
 
 Harshu AI OS includes an automated local deployment script (`scripts/deploy_local.ps1`) to simulate production-style zero-downtime-conscious release workflows on a local workstation without requiring paid cloud infrastructure.
 
-- **Why Immutable SHA Tags:** Deployments strictly reject `latest` and require immutable commit tags (e.g. `sha-3d4f8eb`). This guarantees that the exact binary artifact tested in CI is deployed without risk of tag drift or cache pollution.
+- **Why SHA-Tagged Deployments:** Deployments strictly reject `latest` and require specific commit tags (e.g. `sha-3d4f8eb`) to track releases back to source commits. Note that while tags are conventional pointers that could technically be reassigned in a registry, the truly content-addressed immutable artifact identifier is the SHA256 image digest (`ghcr.io/...@sha256:<digest>`).
 - **Deploy Command:**
   ```powershell
   .\scripts\deploy_local.ps1 -ImageTag sha-3d4f8eb
@@ -290,6 +292,30 @@ Harshu AI OS includes an automated local deployment script (`scripts/deploy_loca
 - **Health Verification:** After container instantiation, the deployment script executes bounded polling against `http://localhost:8000/health` requiring HTTP 200 and `{"status":"healthy"}` before marking deployment as successful.
 - **Automatic Rollback:** If the candidate image fails to start or fails the health check within the timeout window, the script automatically terminates the candidate, restores the previously running container version with identical environment and volume bindings, and verifies health of the restored service.
 - **Scope & Limitations:** This is a **local production simulation** running a single standalone container bound to local host ports and `./data` storage. It does not replace cloud-native production architectures (such as Kubernetes orchestrators, multi-replica horizontal autoscaling, external managed vector databases, or global load balancers).
+
+---
+
+## Observability (v1)
+
+Harshu AI OS provides request-level observability to trace every HTTP request through structured logs with low overhead.
+
+```text
+HTTP Request
+  ↓
+Request ID (X-Request-ID Header or Generated UUID)
+  ↓
+Concurrency-Safe Context (Python contextvars)
+  ↓
+Structured JSON Logs (http_request_started, http_request_completed, http_request_failed)
+  ↓
+Status + Latency (time.perf_counter) + Error Correlation
+```
+
+### Key Features
+- **Request ID Propagation:** Client-supplied `X-Request-ID` headers are validated and sanitized (or a fresh UUID4 is generated), stored in `contextvars`, and returned in the `X-Request-ID` response header.
+- **Structured JSON Logging:** Emits machine-readable single-line JSON log entries for all request lifecycle events and application logs.
+- **Latency & Error Tracking:** Server-side request duration (`duration_ms`) is measured via `time.perf_counter()`. Unhandled exceptions emit `http_request_failed` with safe error type classification without exposing sensitive payloads or raw exception strings.
+- **Scope Notice:** This milestone implements **Observability v1** (request correlation, latency, and structured logging). It does not include distributed tracing (Jaeger/OpenTelemetry), Prometheus metrics exporters, Grafana dashboards, or external monitoring SaaS.
 
 ---
 

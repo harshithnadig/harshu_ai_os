@@ -180,7 +180,8 @@ def get_evaluation_resources(force_offline: bool = False):
         try:
             client = get_embedding_client()
             # Test connectivity
-            client.post("/embeddings", json={"model": EMBEDDING_MODEL, "input": "ping"}, timeout=2.0)
+            probe = client.post("/embeddings", json={"model": EMBEDDING_MODEL, "input": "ping"}, timeout=2.0)
+            probe.raise_for_status()
             collection = get_notes_collection()
             if collection.count() == 0:
                 docs_path = Path("examples/documents")

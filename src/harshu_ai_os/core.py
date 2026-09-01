@@ -26,8 +26,10 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
 
     if not logger.handlers:
+        from harshu_ai_os.observability.logging import StructuredJsonFormatter
+
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        handler.setFormatter(StructuredJsonFormatter())
         logger.addHandler(handler)
 
     logger.setLevel(logging.INFO)
@@ -41,6 +43,7 @@ def get_omniroute_config() -> tuple[str, str]:
     api_key = os.getenv("OMNIROUTE_API_KEY")
     if not api_key:
         from pathlib import Path
+
         local_env = Path(__file__).resolve().parent.parent.parent / "omiroute" / ".env"
         if local_env.exists():
             with open(local_env, "r", encoding="utf-8") as f:
@@ -49,4 +52,3 @@ def get_omniroute_config() -> tuple[str, str]:
                         api_key = line.split("=", 1)[1].strip()
                         break
     return base_url, api_key or "sk-dummy"
-
