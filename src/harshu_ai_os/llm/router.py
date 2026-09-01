@@ -82,18 +82,21 @@ def choose_route(task_type: str) -> dict:
     if task_type == "simple":
         return {
             "model": SIMPLE_MODEL,
+            "fallback_model": GENERAL_MODEL,
             "max_tokens": 150,
         }
 
     if task_type == "general":
         return {
             "model": GENERAL_MODEL,
+            "fallback_model": REASONING_MODEL,
             "max_tokens": 500,
         }
 
     if task_type == "complex":
         return {
             "model": REASONING_MODEL,
+            "fallback_model": GENERAL_MODEL,
             "max_tokens": 2000,
         }
 

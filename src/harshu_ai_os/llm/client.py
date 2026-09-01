@@ -13,7 +13,15 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 from litellm import completion
-from litellm.exceptions import ServiceUnavailableError
+from litellm.exceptions import (
+    APIConnectionError,
+    AuthenticationError,
+    BadRequestError,
+    PermissionDeniedError,
+    RateLimitError,
+    ServiceUnavailableError,
+    Timeout,
+)
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -21,8 +29,24 @@ from tenacity import (
     wait_exponential,
 )
 
-from harshu_ai_os.core import get_omniroute_config
-from harshu_ai_os.llm.exceptions import LLMServiceError
+from harshu_ai_os.core import get_logger, get_omniroute_config
+from harshu_ai_os.llm.exceptions import (
+    LLMAuthenticationError,
+    LLMRateLimitError,
+    LLMServiceError,
+    LLMTimeoutError,
+)
+
+logger = get_logger(__name__)
+
+# Transient errors that qualify for bounded retries with exponential backoff
+TRANSIENT_LLM_ERRORS = (
+    ServiceUnavailableError,
+    RateLimitError,
+    APIConnectionError,
+    Timeout,
+    TimeoutError,
+)
 
 # Routes intentionally contain provider-specific controls. LiteLLM drops only
 # controls unsupported by the selected provider instead of rejecting the call.
@@ -31,12 +55,12 @@ litellm.drop_params = True
 
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=5),
-    retry=retry_if_exception_type(ServiceUnavailableError),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=3),
+    retry=retry_if_exception_type(TRANSIENT_LLM_ERRORS),
     reraise=True,
 )
 def make_llm_call(completion_args: dict):
-    """Retry only transient provider-unavailable failures for direct calls."""
+    """Retry only transient provider failures with bounded exponential backoff."""
     return completion(**completion_args)
 
 
@@ -97,7 +121,29 @@ def call_llm(
             completion_args["tools"] = tools
             completion_args["tool_choice"] = "auto"
 
-        response = make_llm_call(completion_args)
+        try:
+            response = make_llm_call(completion_args)
+        except Exception as primary_error:
+            fallback_model = route.get("fallback_model")
+            if fallback_model and fallback_model != route.get("model") and not tools:
+                logger.warning(
+                    "llm_primary_failed_trying_fallback",
+                    extra={
+                        "event": "llm_fallback_attempt",
+                        "primary_model": route.get("model"),
+                        "fallback_model": fallback_model,
+                        "error_type": type(primary_error).__name__,
+                    },
+                )
+                fallback_args = dict(completion_args)
+                fallback_args["model"] = fallback_model
+                try:
+                    response = make_llm_call(fallback_args)
+                except Exception:
+                    raise primary_error
+            else:
+                raise primary_error
+
         message = response.choices[0].message
 
         tool_calls = getattr(message, "tool_calls", None)
@@ -196,10 +242,18 @@ def call_llm(
             }
         return final_answer
 
-    except ServiceUnavailableError:
-        raise LLMServiceError(
-            "AI service is temporarily unavailable. Please try again."
-        )
+    except AuthenticationError as exc:
+        raise LLMAuthenticationError("AI service authentication failed.") from exc
+    except (Timeout, TimeoutError) as exc:
+        raise LLMTimeoutError("AI service request timed out.") from exc
+    except RateLimitError as exc:
+        raise LLMRateLimitError("AI service rate limit reached.") from exc
+    except (ServiceUnavailableError, APIConnectionError):
+        raise LLMServiceError("AI service is temporarily unavailable. Please try again.")
+    except Exception as exc:
+        if isinstance(exc, LLMServiceError):
+            raise
+        raise LLMServiceError("AI service is temporarily unavailable. Please try again.") from exc
 
 
 class OmniRouteChatModel(BaseChatModel):
