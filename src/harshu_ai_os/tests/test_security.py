@@ -1,27 +1,30 @@
-"""Tests for Security Baseline: auth, rate limiting, payload limits, and readiness."""
+"""Tests for Security Baseline: auth fail-closed, rate limiting, payload limits, and readiness."""
 
 from fastapi.testclient import TestClient
 from harshu_ai_os.api.main import app
-from harshu_ai_os.api.security import InMemoryRateLimiter, global_rate_limiter
+from harshu_ai_os.api.security import InMemoryRateLimiter, global_rate_limiter, is_auth_disabled
 
 client = TestClient(app)
 
 
-def test_health_and_readiness_probes():
-    # Liveness
+def test_health_and_readiness_probes_remain_public(monkeypatch):
+    """Probes must remain public even when auth is unconfigured or failing closed."""
+    monkeypatch.delenv("HARSHU_API_KEY", raising=False)
+    monkeypatch.delenv("HARSHU_AUTH_DISABLED", raising=False)
+
+    # Liveness must return 200 without credentials
     resp_liveness = client.get("/health")
     assert resp_liveness.status_code == 200
     assert resp_liveness.json() == {"status": "healthy"}
 
-    # Readiness
+    # Readiness must return 200 without credentials
     resp_ready = client.get("/ready")
     assert resp_ready.status_code == 200
-    data = resp_ready.json()
-    assert data["status"] == "ready"
-    assert data["checks"]["chroma_store"] == "ok"
+    assert resp_ready.json()["status"] == "ready"
 
 
 def test_readiness_probe_failure_mode(monkeypatch):
+    """Readiness fails with 503 when vector store is down, but not due to auth."""
     def mock_failing_collection():
         raise RuntimeError("Disk full / DB unavailable")
 
@@ -33,45 +36,108 @@ def test_readiness_probe_failure_mode(monkeypatch):
     assert "unhealthy: RuntimeError" in data["checks"]["chroma_store"]
 
 
-def test_auth_dev_mode_allowed(monkeypatch):
+def test_state_1_no_key_no_bypass_fails_closed(monkeypatch):
+    """State 1: No HARSHU_API_KEY and no HARSHU_AUTH_DISABLED fails closed with 503."""
     monkeypatch.delenv("HARSHU_API_KEY", raising=False)
+    monkeypatch.delenv("HARSHU_AUTH_DISABLED", raising=False)
+
+    for endpoint in ("/ask", "/ask/rag", "/ask/agent"):
+        resp = client.post(endpoint, json={"question": "What is Harshu AI OS?"})
+        assert resp.status_code == 503
+        assert "server authentication is unconfigured" in resp.json()["detail"]
+
+
+def test_state_2_explicit_auth_disabled_permitted(monkeypatch):
+    """State 2: No HARSHU_API_KEY but HARSHU_AUTH_DISABLED=true permits request past auth."""
+    monkeypatch.delenv("HARSHU_API_KEY", raising=False)
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+
+    # Mock execution so it does not require a live provider
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {"answer": "Mocked response", "complexity": "simple", "workflow_used": "direct"},
+    )
+
     resp = client.post("/ask", json={"question": "What is Harshu AI OS?"})
-    # Should not be rejected with 401
-    assert resp.status_code != 401
+    assert resp.status_code == 200
+    assert resp.json()["answer"] == "Mocked response"
 
 
-def test_auth_enforced_when_configured(monkeypatch):
+def test_state_3_configured_key_with_missing_or_wrong_credential_returns_401(monkeypatch):
+    """State 3: HARSHU_API_KEY configured + missing/wrong client credential -> HTTP 401."""
     test_key = "secret-test-key-998877"
     monkeypatch.setenv("HARSHU_API_KEY", test_key)
+    monkeypatch.delenv("HARSHU_AUTH_DISABLED", raising=False)
 
-    # 1. Missing key -> 401
+    # 1. Missing header -> 401
     resp_missing = client.post("/ask", json={"question": "Test query"})
     assert resp_missing.status_code == 401
     assert resp_missing.json()["detail"] == "Invalid or missing API key"
 
-    # 2. Invalid key -> 401
-    resp_invalid = client.post(
+    # 2. Invalid X-API-Key -> 401
+    resp_invalid_key = client.post(
         "/ask",
         json={"question": "Test query"},
         headers={"X-API-Key": "wrong-key"},
     )
-    assert resp_invalid.status_code == 401
+    assert resp_invalid_key.status_code == 401
 
-    # 3. Valid X-API-Key -> authorized
-    resp_valid_header = client.post(
+    # 3. Invalid Authorization Bearer -> 401
+    resp_invalid_bearer = client.post(
+        "/ask",
+        json={"question": "Test query"},
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    assert resp_invalid_bearer.status_code == 401
+
+
+def test_state_4_configured_key_with_correct_credential_permitted(monkeypatch):
+    """State 4: HARSHU_API_KEY configured + correct client credential -> request permitted."""
+    test_key = "secret-test-key-998877"
+    monkeypatch.setenv("HARSHU_API_KEY", test_key)
+    monkeypatch.delenv("HARSHU_AUTH_DISABLED", raising=False)
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {"answer": "Authenticated response", "complexity": "simple", "workflow_used": "direct"},
+    )
+
+    # Valid X-API-Key
+    resp_header = client.post(
         "/ask",
         json={"question": "Test query"},
         headers={"X-API-Key": test_key},
     )
-    assert resp_valid_header.status_code != 401
+    assert resp_header.status_code == 200
+    assert resp_header.json()["answer"] == "Authenticated response"
 
-    # 4. Valid Authorization: Bearer <key> -> authorized
-    resp_valid_bearer = client.post(
+    # Valid Authorization: Bearer <key>
+    resp_bearer = client.post(
         "/ask",
         json={"question": "Test query"},
         headers={"Authorization": f"Bearer {test_key}"},
     )
-    assert resp_valid_bearer.status_code != 401
+    assert resp_bearer.status_code == 200
+    assert resp_bearer.json()["answer"] == "Authenticated response"
+
+
+def test_auth_disabled_rejects_false_and_invalid_values(monkeypatch):
+    """HARSHU_AUTH_DISABLED values that are not '1', 'true', 'yes' must NOT disable auth."""
+    monkeypatch.delenv("HARSHU_API_KEY", raising=False)
+
+    for invalid_val in ("false", "0", "no", "random-string", "none"):
+        monkeypatch.setenv("HARSHU_AUTH_DISABLED", invalid_val)
+        assert is_auth_disabled() is False
+
+        resp = client.post("/ask", json={"question": "Test query"})
+        assert resp.status_code == 503
+
+
+def test_auth_disabled_accepts_truthy_variations(monkeypatch):
+    """Accepts case-insensitive '1', 'true', 'yes'."""
+    for truthy_val in ("1", "true", "TRUE", "True", "yes", "YES"):
+        monkeypatch.setenv("HARSHU_AUTH_DISABLED", truthy_val)
+        assert is_auth_disabled() is True
 
 
 def test_rate_limiter_unit_behavior():
@@ -106,6 +172,7 @@ def test_rate_limiter_unit_behavior():
 def test_rate_limiting_endpoint_integration(monkeypatch):
     global_rate_limiter.reset()
     monkeypatch.setattr(global_rate_limiter, "requests_per_minute", 2)
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
 
     try:
         r1 = client.post("/ask", json={"question": "First"})
@@ -133,7 +200,8 @@ def test_payload_size_limit_rejected():
     assert "x-request-id" in resp.headers
 
 
-def test_question_max_length_validation():
+def test_question_max_length_validation(monkeypatch):
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
     overly_long_question = "A" * 4001
     resp = client.post("/ask", json={"question": overly_long_question})
     assert resp.status_code == 422

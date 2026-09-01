@@ -12,7 +12,8 @@ The project demonstrates request planning, model routing, local ChromaDB vector 
 
 - **Unified Request Orchestration:** Single entrypoint `POST /ask` with automated complexity classification and workflow routing (`DIRECT`, `AGENT`, `STRICT_RAG`).
 - **Security Baseline & Abuse Protection:**
-  - Constant-time API key auth (`X-API-Key` or `Authorization: Bearer`) via `hmac.compare_digest` with dev-mode fallback.
+  - Fail-closed API key authentication (`X-API-Key` or `Authorization: Bearer`) via `hmac.compare_digest`. Required by default.
+  - Missing `HARSHU_API_KEY` fails closed with HTTP 503. Local development without auth requires explicit `HARSHU_AUTH_DISABLED=true`.
   - Deterministic sliding-window rate limiting (60 req/min per client IP) with HTTP 429 and `Retry-After` headers.
   - Strict 64KB request body payload limit enforced at pure ASGI middleware level (HTTP 413).
   - Question length validation capped at 4,000 characters (HTTP 422).
@@ -378,11 +379,12 @@ npm run build
 
 Harshu AI OS enforces defense-in-depth protections across the request lifecycle:
 
-1. **API Key Authentication (`api/security.py`):**
-   - Configured via environment variable `HARSHU_API_KEY`.
+1. **Fail-Closed API Key Authentication (`api/security.py`):**
+   - **Authentication is required by default.** Protected endpoints (`POST /ask`, `POST /ask/rag`, `POST /ask/agent`) strictly enforce credentials. Public endpoints (`GET /health`, `GET /ready`) remain accessible without credentials.
    - Supports `X-API-Key: <key>` and `Authorization: Bearer <key>`.
-   - Uses constant-time string comparison (`hmac.compare_digest`) to resist timing attacks.
-   - When `HARSHU_API_KEY` is unset or empty, the server operates in development mode (fail-open for local DX). When set, all non-exempt endpoints strictly require authentication (HTTP 401).
+   - Uses constant-time string comparison (`hmac.compare_digest`) to resist timing side-channel attacks.
+   - **Fail-Closed Guarantee:** If `HARSHU_API_KEY` is not configured, protected endpoints fail closed with HTTP 503 Service Unavailable (`Authentication service unavailable: server authentication is unconfigured`) without exposing server internals or secrets.
+   - **Explicit Local Development Bypass:** Unauthenticated requests are permitted *only* when `HARSHU_AUTH_DISABLED=true` (or `1`, `yes`) is explicitly configured in the local environment. Never enable this flag in a deployed, staging, or shared environment.
 2. **Deterministic Sliding-Window Rate Limiter:**
    - Thread-safe in-memory rate limiter tracking client IP addresses across a rolling 60-second window.
    - Default threshold: 60 requests/minute. Rejections return HTTP 429 with standard `Retry-After: <seconds>` header.

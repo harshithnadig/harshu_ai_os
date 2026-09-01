@@ -11,8 +11,18 @@ MAX_PAYLOAD_BYTES = 65536  # 64 KB max payload size for AI endpoints
 DEFAULT_RATE_LIMIT_PER_MINUTE = 60
 
 
+def is_auth_disabled() -> bool:
+    """Check if authentication is explicitly disabled for local development only.
+
+    Accepts deliberately narrow truthy values: '1', 'true', 'yes' (case-insensitive).
+    Any other value (including unset or empty) evaluates to False (fail-closed).
+    """
+    val = os.getenv("HARSHU_AUTH_DISABLED", "").strip().lower()
+    return val in ("1", "true", "yes")
+
+
 def get_configured_api_key() -> str | None:
-    """Retrieve the configured API key from environment, or None if in dev mode."""
+    """Retrieve the configured API key from environment, or None if unconfigured."""
     key = os.getenv("HARSHU_API_KEY", "").strip()
     return key if key else None
 
@@ -22,14 +32,28 @@ def verify_api_key(
     x_api_key: str | None = Header(None, alias="X-API-Key"),
     authorization: str | None = Header(None, alias="Authorization"),
 ) -> None:
-    """Enforce environment-driven API key authentication.
+    """Enforce fail-closed API key authentication for protected endpoints.
 
-    If HARSHU_API_KEY is unset or empty, requests are permitted (development mode).
-    If HARSHU_API_KEY is configured, client must supply matching X-API-Key or Bearer token.
+    State Machine:
+    1. If HARSHU_AUTH_DISABLED is explicitly truthy ('1', 'true', 'yes'):
+       -> Request permitted (explicit local development bypass only).
+    2. If HARSHU_API_KEY is not configured:
+       -> Fails closed with HTTP 503 Service Unavailable (server misconfigured).
+    3. If HARSHU_API_KEY is configured:
+       -> If client provides matching X-API-Key or Bearer token (constant-time):
+          -> Request permitted.
+       -> Otherwise:
+          -> HTTP 401 Unauthorized.
     """
+    if is_auth_disabled():
+        return
+
     required_key = get_configured_api_key()
     if not required_key:
-        return
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service unavailable: server authentication is unconfigured",
+        )
 
     provided_key: str | None = x_api_key
     if not provided_key and authorization:
