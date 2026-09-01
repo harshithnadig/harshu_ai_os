@@ -1,7 +1,7 @@
 """Synthetic data generator for RAG Evaluation Arena v1."""
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple
 
 @dataclass

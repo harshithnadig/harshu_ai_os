@@ -4,7 +4,6 @@ import hmac
 import os
 import threading
 import time
-from typing import Any
 
 from fastapi import Header, HTTPException, Request
 

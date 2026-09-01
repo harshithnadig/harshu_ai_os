@@ -36,14 +36,14 @@ dt = (time.perf_counter() - t0) * 1000.0
 post_logs_data = admin_client.get("http://127.0.0.1:20128/api/usage/call-logs").json()
 latest_log = post_logs_data[0] if post_logs_data else {}
 
-print(f"\nResult from classify_task_with_model():")
+print("\nResult from classify_task_with_model():")
 print(f"  Execution Latency: {round(dt, 2)} ms")
 print(f"  Parsed Complexity: {classification.complexity}")
 print(f"  needs_current_information: {classification.needs_current_information}")
 print(f"  needs_tool: {classification.needs_tool}")
 print(f"  Raw Pydantic Object: {classification}")
 
-print(f"\nOmniRoute Gateway Log Verification:")
+print("\nOmniRoute Gateway Log Verification:")
 print(f"  Total Gateway Calls Tracked: {len(post_logs_data)} (was {pre_logs})")
 print(f"  Dispatched Provider: {latest_log.get('provider')}")
 print(f"  Actual Model Used: {latest_log.get('model')}")

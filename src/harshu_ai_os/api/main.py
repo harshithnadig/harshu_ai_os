@@ -69,7 +69,7 @@ def readiness_check():
     """Readiness probe verifying vector store and critical configuration."""
     checks: dict[str, str] = {}
     try:
-        collection = get_notes_collection()
+        _ = get_notes_collection()
         checks["chroma_store"] = "ok"
     except Exception as exc:
         checks["chroma_store"] = f"unhealthy: {type(exc).__name__}"

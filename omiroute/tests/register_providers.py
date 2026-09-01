@@ -1,6 +1,5 @@
 """Helper to register clean API keys into the running OmniRoute instance."""
 
-import re
 import sys
 from pathlib import Path
 import httpx

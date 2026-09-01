@@ -1,6 +1,6 @@
 """Tests for LLM Reliability Hardening: bounded retries, permanent vs transient failures, and fallback."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import pytest
 from litellm.exceptions import (
     AuthenticationError,
@@ -9,14 +9,13 @@ from litellm.exceptions import (
     Timeout,
 )
 
-from harshu_ai_os.llm.client import call_llm, make_llm_call
+from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.exceptions import (
     LLMAuthenticationError,
     LLMRateLimitError,
     LLMServiceError,
     LLMTimeoutError,
 )
-from harshu_ai_os.llm.router import choose_route
 
 
 def test_transient_failure_retries_and_succeeds(monkeypatch):

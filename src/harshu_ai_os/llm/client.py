@@ -16,8 +16,6 @@ from litellm import completion
 from litellm.exceptions import (
     APIConnectionError,
     AuthenticationError,
-    BadRequestError,
-    PermissionDeniedError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,

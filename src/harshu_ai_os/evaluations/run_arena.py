@@ -265,7 +265,7 @@ def print_arena_metrics(results: List[Dict[str, Any]], use_reranker: bool, use_h
         cat = r["category"]
         categories[cat] = categories.get(cat, 0) + 1
         
-    print(f"\n=== ARENA METRICS (Side-by-Side Rematch) ===")
+    print("\n=== ARENA METRICS (Side-by-Side Rematch) ===")
     print(f"Total Queries Evaluated : {total} ({len(answerable)} Supported, {len(unsupported)} Unsupported)")
     
     dense_metrics = compute_metrics(results, "dense_ids")

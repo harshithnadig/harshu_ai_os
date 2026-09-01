@@ -5,8 +5,6 @@ import os
 import time
 import httpx
 
-import os
-from pathlib import Path
 
 GATEWAY_URL = os.environ.get("OMNIROUTE_GATEWAY_URL", "http://127.0.0.1:20128")
 V1_URL = f"{GATEWAY_URL}/v1"
@@ -48,7 +46,7 @@ def test_step_5_live_chat():
     usage = data.get("usage", {})
 
     print(f"HTTP Status: {r.status_code}")
-    print(f"Requested Role: harshu-general")
+    print("Requested Role: harshu-general")
     print(f"Actual Model: {selected_model}")
     print(f"Response Content: {content}")
     print(f"Latency: {round(latency_ms, 2)} ms")
@@ -95,7 +93,7 @@ def test_step_6_live_classifier():
     assert isinstance(parsed["needs_tool"], bool)
 
     print(f"HTTP Status: {r.status_code}")
-    print(f"Requested Role: harshu-classifier")
+    print("Requested Role: harshu-classifier")
     print(f"Actual Model: {selected_model}")
     print(f"Raw Provider Output:\n{raw_content}")
     print(f"Parsed JSON Object:\n{json.dumps(parsed, indent=2)}")
@@ -145,7 +143,7 @@ def test_step_7_live_judge():
     assert isinstance(parsed["supporting_chunk_ids"], list)
 
     print(f"HTTP Status: {r.status_code}")
-    print(f"Requested Role: harshu-judge")
+    print("Requested Role: harshu-judge")
     print(f"Actual Model: {selected_model}")
     print(f"Raw Judge Output:\n{raw_content}")
     print(f"Parsed JSON:\n{json.dumps(parsed, indent=2)}")
@@ -302,7 +300,7 @@ def test_step_10_and_15_live_memory():
             matched = True
 
     resolution = ret_data.get("resolution", {})
-    print(f"\n3. Execution Mechanics:")
+    print("\n3. Execution Mechanics:")
     print(f"   Strategy Used: {resolution.get('strategyUsed')}")
     print(f"   Vector Store: {resolution.get('vectorStore')}")
     print(f"   Embedding Source: {resolution.get('embeddingSource')}")

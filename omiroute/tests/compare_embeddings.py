@@ -1,8 +1,6 @@
-import os
 import httpx
 from pathlib import Path
 from dotenv import load_dotenv
-from google import genai
 from harshu_ai_os.rag.embedding_client import get_embedding_client, embed_text
 
 load_dotenv()
@@ -11,8 +9,8 @@ load_dotenv()
 text = "Harshu AI OS local embedding comparison"
 direct_client = get_embedding_client()
 direct_vec = embed_text(direct_client, text)
-print(f"Direct Google SDK embedding:")
-print(f"  Model: gemini-embedding-2")
+print("Direct Google SDK embedding:")
+print("  Model: gemini-embedding-2")
 print(f"  Vector length: {len(direct_vec)}")
 print(f"  First 5 floats: {direct_vec[:5]}")
 
@@ -34,14 +32,14 @@ r = httpx.post(
 data = r.json()
 gateway_vec = data["data"][0]["embedding"]
 gateway_model = data.get("model")
-print(f"\nOmniRoute Gateway embedding:")
-print(f"  Logical Model: harshu-embedding")
+print("\nOmniRoute Gateway embedding:")
+print("  Logical Model: harshu-embedding")
 print(f"  Returned Model Identity: {gateway_model}")
 print(f"  Vector length: {len(gateway_vec)}")
 print(f"  First 5 floats: {gateway_vec[:5]}")
 
 # Compare
-print(f"\nComparison:")
+print("\nComparison:")
 print(f"  Dimension Match: {len(direct_vec) == len(gateway_vec)} ({len(direct_vec)} == {len(gateway_vec)})")
 # Check cosine similarity
 import numpy as np

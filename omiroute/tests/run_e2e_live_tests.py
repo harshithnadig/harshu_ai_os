@@ -1,11 +1,9 @@
 """Comprehensive live end-to-end test suite for Harshu AI OS with OmniRoute gateway."""
 
-import sys
 import time
 import httpx
 from pathlib import Path
 
-from harshu_ai_os.core import get_omniroute_config
 from harshu_ai_os.llm.client import call_llm
 from harshu_ai_os.llm.router import classify_task_with_model, choose_route
 from harshu_ai_os.llm.tools import AVAILABLE_TOOLS, WEB_SEARCH_TOOL_SCHEMA
@@ -46,7 +44,7 @@ safe_print("=" * 80)
 # TEST A - NORMAL SIMPLE / GENERAL
 # ------------------------------------------------------------------------------
 q_a = "What is a Python dictionary?"
-safe_print(f"\n[TEST A - NORMAL SIMPLE / GENERAL]")
+safe_print("\n[TEST A - NORMAL SIMPLE / GENERAL]")
 safe_print(f"  Input Question: \"{q_a}\"")
 t0 = time.perf_counter()
 clf_a = classify_task_with_model(q_a)
@@ -67,7 +65,7 @@ safe_print(f"  Duration: {round(dt_a, 2)} ms")
 # TEST B - REASONING
 # ------------------------------------------------------------------------------
 q_b = "Design a secure, multi-tenant RAG architecture with end-to-end encryption, multi-tier threat modeling, and trade-off analysis."
-safe_print(f"\n[TEST B - REASONING]")
+safe_print("\n[TEST B - REASONING]")
 safe_print(f"  Input Question: \"{q_b}\"")
 t0 = time.perf_counter()
 clf_b = classify_task_with_model(q_b)
@@ -87,7 +85,7 @@ safe_print(f"  Duration: {round(dt_b, 2)} ms")
 # TEST C - WEB TOOL
 # ------------------------------------------------------------------------------
 q_c = "What is the release date or latest release version of Python 3.13? Use web search to find current information."
-safe_print(f"\n[TEST C - WEB TOOL]")
+safe_print("\n[TEST C - WEB TOOL]")
 safe_print(f"  Input Question: \"{q_c}\"")
 t0 = time.perf_counter()
 clf_c = classify_task_with_model(q_c)
@@ -110,7 +108,7 @@ safe_print(f"  Duration: {round(dt_c, 2)} ms")
 # TEST D - RAG ANSWERABLE
 # ------------------------------------------------------------------------------
 q_d = "How is Harshu AI OS tested?"
-safe_print(f"\n[TEST D - RAG ANSWERABLE]")
+safe_print("\n[TEST D - RAG ANSWERABLE]")
 safe_print(f"  Input Question: \"{q_d}\"")
 collection = get_notes_collection()
 embedding_client = get_embedding_client()
@@ -132,7 +130,7 @@ safe_print(f"  Retrieval ms: {round(res_d.get('retrieval_ms', 0), 2)} | Judge ms
 # TEST E - RAG ABSTENTION
 # ------------------------------------------------------------------------------
 q_e = "Does ChromaDB automatically handle user password hashing in Harshu AI OS?"
-safe_print(f"\n[TEST E - RAG ABSTENTION]")
+safe_print("\n[TEST E - RAG ABSTENTION]")
 safe_print(f"  Input Question: \"{q_e}\"")
 clf_e = classify_task_with_model(q_e)
 route_e = choose_route(clf_e.complexity)
@@ -151,13 +149,13 @@ safe_print(f"  Answer: \"{res_e['answer']}\"")
 # ------------------------------------------------------------------------------
 # TEST F - EMBEDDING
 # ------------------------------------------------------------------------------
-safe_print(f"\n[TEST F - EMBEDDINGS (MATCHING HARSHU AI OS)]")
+safe_print("\n[TEST F - EMBEDDINGS (MATCHING HARSHU AI OS)]")
 t0 = time.perf_counter()
 emb_vec = embed_text(embedding_client, "Harshu AI OS live verification embedding")
 dt_f = (time.perf_counter() - t0) * 1000.0
 
-safe_print(f"  Logical Role: harshu-embedding")
-safe_print(f"  Actual Model: gemini/gemini-embedding-2")
+safe_print("  Logical Role: harshu-embedding")
+safe_print("  Actual Model: gemini/gemini-embedding-2")
 safe_print(f"  Dimension: {len(emb_vec)}")
 safe_print(f"  Latency: {round(dt_f, 2)} ms")
 safe_print(f"  First 3 floats: {emb_vec[:3]}")

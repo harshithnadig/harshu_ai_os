@@ -1,6 +1,5 @@
 """Tests for MCP v1 (Model Context Protocol) integration."""
 
-from unittest.mock import MagicMock
 from harshu_ai_os.mcp.server import MCPServer
 
 

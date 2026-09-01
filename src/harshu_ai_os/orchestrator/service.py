@@ -6,7 +6,6 @@ Coordinates planning and deterministic execution between:
 3. STRICT_RAG: Grounded retrieval with distance filter, sufficiency judge, and citations.
 """
 
-import json
 import re
 from typing import Any, Literal, Optional
 

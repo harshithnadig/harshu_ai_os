@@ -6,11 +6,10 @@ with an explicit tool-step budget constraint.
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from harshu_ai_os.core import get_omniroute_config
 from harshu_ai_os.llm.client import (
-    SYSTEM_PROMPT,
     TOOL_SYNTHESIS_SYSTEM_PROMPT,
     build_messages,
     make_llm_call,

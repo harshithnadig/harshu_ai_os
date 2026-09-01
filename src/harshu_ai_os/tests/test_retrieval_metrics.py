@@ -1,4 +1,3 @@
-import pytest
 from harshu_ai_os.evaluations.retrieval_metrics import (
     calculate_hit_at_k,
     calculate_mrr,

@@ -2,12 +2,11 @@
 
 import sys
 from pathlib import Path
-import pytest
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR.parent))
 
-from omiroute.client.gateway_client import OmniRouteClient, MemoryItem
+from omiroute.client.gateway_client import MemoryItem
 
 
 class LocalMemorySimulator:

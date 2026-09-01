@@ -12,7 +12,6 @@ Validates system resiliency under simulated real-world failures:
 """
 
 from unittest.mock import MagicMock, patch
-import pytest
 from fastapi.testclient import TestClient
 from litellm.exceptions import ServiceUnavailableError
 
@@ -172,7 +171,6 @@ def test_chaos_deployment_rollback_logic():
     deployment_healthy = False
     previous_image = "ghcr.io/harshithnadig/harshu_ai_os:sha-c5948ef"
 
-    poll_attempts = 3
     health_status = [False, False, False]
     for status in health_status:
         if status:

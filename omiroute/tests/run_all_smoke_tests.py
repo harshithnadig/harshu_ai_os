@@ -6,7 +6,6 @@ plus an isolated test of the memory subsystem contract.
 """
 
 import json
-import re
 import sys
 import time
 from pathlib import Path

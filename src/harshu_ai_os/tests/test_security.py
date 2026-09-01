@@ -1,6 +1,5 @@
 """Tests for Security Baseline: auth, rate limiting, payload limits, and readiness."""
 
-import pytest
 from fastapi.testclient import TestClient
 from harshu_ai_os.api.main import app
 from harshu_ai_os.api.security import InMemoryRateLimiter, global_rate_limiter

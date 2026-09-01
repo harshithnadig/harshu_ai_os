@@ -2,8 +2,6 @@
 Rotates admin password and API keys without printing secrets to stdout.
 """
 
-import json
-import os
 import secrets
 import subprocess
 import sys

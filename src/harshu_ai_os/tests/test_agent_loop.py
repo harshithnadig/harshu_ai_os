@@ -6,10 +6,8 @@ live external model endpoints.
 """
 
 from unittest.mock import MagicMock, patch
-import pytest
 
 from harshu_ai_os.agents.loop import (
-    DEFAULT_MAX_STEPS,
     execute_single_tool,
     run_agent_loop,
 )
@@ -382,7 +380,7 @@ def test_agent_loop_repeated_call_guard(mock_make_call):
     fake_tools = {"web_search": lambda query: {"content": "Python 3.12", "sources": []}}
     route = {"model": "openai/harshu-tools", "max_tokens": 500}
 
-    result = run_agent_loop(
+    _ = run_agent_loop(
         route=route,
         user_prompt="Find python version",
         tools=[WEB_SEARCH_TOOL_SCHEMA],

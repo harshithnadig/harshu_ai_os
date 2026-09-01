@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from harshu_ai_os.api.main import app
 from harshu_ai_os.llm.exceptions import LLMServiceError
 from harshu_ai_os.llm.router import TaskClassification
-from harshu_ai_os.orchestrator.service import RequestPlan
 
 client = TestClient(app)
 
