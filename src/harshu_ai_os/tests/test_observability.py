@@ -408,3 +408,272 @@ def test_ai_workflow_telemetry_in_logs(log_capture, monkeypatch):
     assert telem["complexity"] == "simple"
     assert telem["abstained"] is False
     assert telem["tool_calls_count"] == 0
+
+
+# ======================================================================
+# 14. Telemetry Truthfulness: exact measured values preserved
+# ======================================================================
+
+def test_ai_telemetry_measured_values_preserved_exactly(log_capture, monkeypatch):
+    """Genuinely measured stage latencies are preserved exactly in AI telemetry."""
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.choose_request_route",
+        lambda q: (
+            type("Classification", (), {"complexity": "general"})(),
+            {"model": "openai/harshu-general"},
+        ),
+    )
+    monkeypatch.setattr("harshu_ai_os.api.main.get_notes_collection", lambda: None)
+    monkeypatch.setattr("harshu_ai_os.api.main.get_embedding_client", lambda: None)
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.answer_with_chroma_rag",
+        lambda *args, **kwargs: {
+            "answer": "Measured answer.",
+            "complexity": "general",
+            "model": "openai/harshu-general",
+            "context": "Evidence context.",
+            "distances": [0.12],
+            "ids": ["doc-1"],
+            "metadatas": [{"source": "doc1.txt"}],
+            "citations": [],
+            "abstained": False,
+            "abstention_reason": None,
+            "judge_reason": "Sufficient context.",
+            "retrieval_ms": 18.42,
+            "reranking_ms": 7.31,
+            "judge_ms": 45.67,
+            "generation_ms": 89.12,
+            "total_ms": 160.52,
+        },
+    )
+
+    req_id = "telem-measured-exact-1"
+    resp = client.post(
+        "/ask/rag",
+        json={"question": "Tell me about measured telemetry."},
+        headers={"X-Request-ID": req_id},
+    )
+    assert resp.status_code == 200
+
+    ai_logs = [
+        json.loads(line)
+        for line in log_capture.formatted_lines
+        if json.loads(line).get("event") == "ai_workflow_completed"
+        and json.loads(line).get("request_id") == req_id
+    ]
+    assert len(ai_logs) == 1
+    telem = ai_logs[0]
+
+    assert telem["retrieval_ms"] == 18.42
+    assert telem["reranking_ms"] == 7.31
+    assert telem["judge_ms"] == 45.67
+    assert telem["generation_ms"] == 89.12
+    assert telem["workflow"] == "strict_rag"
+    assert telem["model"] == "openai/harshu-general"
+    assert telem["abstained"] is False
+
+
+# ======================================================================
+# 15. Telemetry Truthfulness: missing stage latency not fake 0.0
+# ======================================================================
+
+def test_ai_telemetry_missing_stage_latency_not_serialized_as_fake_zero(log_capture, monkeypatch):
+    """Unmeasured stages (e.g. judge/generation during distance filter abstention) must NOT be logged as 0.0."""
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.choose_request_route",
+        lambda q: (
+            type("Classification", (), {"complexity": "general"})(),
+            {"model": "openai/harshu-general"},
+        ),
+    )
+    monkeypatch.setattr("harshu_ai_os.api.main.get_notes_collection", lambda: None)
+    monkeypatch.setattr("harshu_ai_os.api.main.get_embedding_client", lambda: None)
+
+    # Scenario A: Distance filter threshold exceeded (judge and generation never ran)
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.answer_with_chroma_rag",
+        lambda *args, **kwargs: {
+            "answer": "I do not have enough information.",
+            "complexity": "general",
+            "model": "openai/harshu-general",
+            "context": "Distant chunk.",
+            "distances": [0.95],
+            "ids": ["doc-2"],
+            "metadatas": [{"source": "doc2.txt"}],
+            "citations": [],
+            "abstained": True,
+            "abstention_reason": "insufficient_context",
+            "judge_reason": "Distance filter threshold exceeded.",
+            "retrieval_ms": 14.25,
+            "judge_ms": None,
+            "generation_ms": None,
+            "total_ms": 14.50,
+        },
+    )
+
+    req_id = "telem-unmeasured-dist-1"
+    resp = client.post(
+        "/ask/rag",
+        json={"question": "Unknown topic?"},
+        headers={"X-Request-ID": req_id},
+    )
+    assert resp.status_code == 200
+
+    ai_logs = [
+        json.loads(line)
+        for line in log_capture.formatted_lines
+        if json.loads(line).get("event") == "ai_workflow_completed"
+        and json.loads(line).get("request_id") == req_id
+    ]
+    assert len(ai_logs) == 1
+    telem = ai_logs[0]
+
+    # Retrieval was measured
+    assert telem["retrieval_ms"] == 14.25
+    # Judge and generation were never executed: must NOT be 0.0
+    assert telem.get("judge_ms") is None
+    assert telem.get("judge_ms") != 0.0
+    assert telem.get("generation_ms") is None
+    assert telem.get("generation_ms") != 0.0
+
+    # Scenario B: Judge ran and deemed insufficient (generation never ran)
+    req_id_b = "telem-unmeasured-judge-2"
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.answer_with_chroma_rag",
+        lambda *args, **kwargs: {
+            "answer": "I do not have enough information.",
+            "complexity": "general",
+            "model": "openai/harshu-general",
+            "context": "Context not answering.",
+            "distances": [0.2],
+            "ids": ["doc-3"],
+            "metadatas": [{"source": "doc3.txt"}],
+            "citations": [],
+            "abstained": True,
+            "abstention_reason": "insufficient_context",
+            "judge_reason": "Not enough evidence.",
+            "retrieval_ms": 15.0,
+            "judge_ms": 32.5,
+            "generation_ms": None,
+            "total_ms": 48.0,
+        },
+    )
+    resp_b = client.post(
+        "/ask/rag",
+        json={"question": "Insufficient topic?"},
+        headers={"X-Request-ID": req_id_b},
+    )
+    assert resp_b.status_code == 200
+
+    ai_logs_b = [
+        json.loads(line)
+        for line in log_capture.formatted_lines
+        if json.loads(line).get("event") == "ai_workflow_completed"
+        and json.loads(line).get("request_id") == req_id_b
+    ]
+    assert len(ai_logs_b) == 1
+    telem_b = ai_logs_b[0]
+
+    assert telem_b["retrieval_ms"] == 15.0
+    assert telem_b["judge_ms"] == 32.5
+    # Generation never ran: must NOT be 0.0
+    assert telem_b.get("generation_ms") is None
+    assert telem_b.get("generation_ms") != 0.0
+
+
+# ======================================================================
+# 16. Telemetry Truthfulness: missing tokens, cost, provider not fabricated
+# ======================================================================
+
+def test_ai_telemetry_missing_tokens_cost_and_provider_not_fabricated(log_capture, monkeypatch):
+    """Missing tokens, cost, provider, and retry_count are NOT fabricated with default zero/empty values."""
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {
+            "answer": "Direct answer without token counts.",
+            "complexity": "simple",
+            "workflow_used": "direct",
+            "model": "openai/harshu-general",
+            "tool_used": False,
+            "tool_calls_count": 0,
+            "tool_sources": [],
+            "citations": [],
+            "abstained": False,
+            "abstention_reason": None,
+            "judge_reason": None,
+            "tool_name": None,
+            "tool_query": None,
+            "stopped_reason": None,
+            "steps_taken": 0,
+        },
+    )
+
+    req_id = "telem-no-fake-tokens-1"
+    resp = client.post("/ask", json={"question": "Simple question"}, headers={"X-Request-ID": req_id})
+    assert resp.status_code == 200
+
+    ai_logs = [
+        json.loads(line)
+        for line in log_capture.formatted_lines
+        if json.loads(line).get("event") == "ai_workflow_completed"
+        and json.loads(line).get("request_id") == req_id
+    ]
+    assert len(ai_logs) == 1
+    telem = ai_logs[0]
+
+    # Telemetry rule: do NOT fabricate default metrics for unmeasured fields
+    assert "prompt_tokens" not in telem
+    assert "completion_tokens" not in telem
+    assert "total_tokens" not in telem
+    assert "cost" not in telem
+    assert "retry_count" not in telem
+    assert "provider" not in telem
+    # Real measured / known values are present
+    assert telem["workflow"] == "direct"
+    assert telem["model"] == "openai/harshu-general"
+    assert telem["tool_calls_count"] == 0
+    assert telem["abstained"] is False
+
+
+# ======================================================================
+# 17. Telemetry Truthfulness: sensitive data not leaked in logs
+# ======================================================================
+
+def test_ai_telemetry_sensitive_data_not_leaked(log_capture, monkeypatch):
+    """Ensure raw prompts, API keys, auth headers, and provider exceptions do not leak into telemetry."""
+    secret_prompt = "CONFIDENTIAL_PAYLOAD_TOP_SECRET_PROMPT_999"
+    secret_key = "sk-live-secret-never-log-this"
+    monkeypatch.setenv("HARSHU_API_KEY", secret_key)
+    monkeypatch.delenv("HARSHU_AUTH_DISABLED", raising=False)
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {
+            "answer": "Safe synthesized response",
+            "complexity": "simple",
+            "workflow_used": "direct",
+            "model": "openai/harshu-general",
+            "tool_used": False,
+            "tool_calls_count": 0,
+        },
+    )
+
+    req_id = "privacy-audit-test-99"
+    resp = client.post(
+        "/ask",
+        json={"question": secret_prompt},
+        headers={
+            "X-Request-ID": req_id,
+            "X-API-Key": secret_key,
+            "Authorization": f"Bearer {secret_key}",
+        },
+    )
+    assert resp.status_code == 200
+
+    all_logs_text = "\n".join(log_capture.formatted_lines)
+    assert secret_prompt not in all_logs_text
+    assert secret_key not in all_logs_text
+    assert "CONFIDENTIAL" not in all_logs_text

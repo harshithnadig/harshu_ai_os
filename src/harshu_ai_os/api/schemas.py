@@ -64,10 +64,11 @@ class AskRagResponse(BaseModel):
     abstained: bool = False
     abstention_reason: str | None = None
     judge_reason: str | None = None
-    retrieval_ms: float = 0.0
-    judge_ms: float = 0.0
-    generation_ms: float = 0.0
-    total_ms: float = 0.0
+    retrieval_ms: float | None = None
+    judge_ms: float | None = None
+    generation_ms: float | None = None
+    total_ms: float | None = None
+    reranking_ms: float | None = None
 
 
 class AskAgentResponse(BaseModel):

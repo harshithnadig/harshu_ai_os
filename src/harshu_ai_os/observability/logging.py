@@ -36,23 +36,27 @@ class StructuredJsonFormatter(logging.Formatter):
             "error_type",
             "workflow",
             "model",
+            "provider",
             "complexity",
+            "retry_count",
+            "fallback_used",
             "tool_calls_count",
             "tool_name",
+            "tool_used",
             "abstained",
             "abstention_reason",
             "retrieval_ms",
+            "reranking_ms",
             "judge_ms",
             "generation_ms",
-            "fallback_used",
             "prompt_tokens",
             "completion_tokens",
             "total_tokens",
+            "cost",
         )
         for field in telemetry_fields:
-            val = getattr(record, field, None)
-            if val is not None:
-                data[field] = val
+            if hasattr(record, field):
+                data[field] = getattr(record, field)
 
         # Include message if distinct from the event name
         message = record.getMessage()

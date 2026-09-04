@@ -1,5 +1,7 @@
 """Tests for Security Baseline: auth fail-closed, rate limiting, payload limits, and readiness."""
 
+import asyncio
+import logging
 from fastapi.testclient import TestClient
 from harshu_ai_os.api.main import app
 from harshu_ai_os.api.security import InMemoryRateLimiter, global_rate_limiter, is_auth_disabled
@@ -205,3 +207,188 @@ def test_question_max_length_validation(monkeypatch):
     overly_long_question = "A" * 4001
     resp = client.post("/ask", json={"question": overly_long_question})
     assert resp.status_code == 422
+
+
+# ======================================================================
+# Actual Byte Body-Limit Enforcement Tests (Pure ASGI Harness)
+# ======================================================================
+
+async def _raw_asgi_post(app_instance, headers=None, chunks=None, path="/ask"):
+    """Focused raw ASGI test harness to construct requests TestClient cannot accurately build."""
+    sent_messages = []
+    chunk_iter = iter(chunks or [])
+
+    async def receive():
+        try:
+            return next(chunk_iter)
+        except StopIteration:
+            return {"type": "http.disconnect"}
+
+    async def send(message):
+        sent_messages.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode("ascii"),
+        "query_string": b"",
+        "headers": headers or [],
+        "client": ("127.0.0.1", 50000),
+        "server": ("127.0.0.1", 80),
+    }
+
+    await app_instance(scope, receive, send)
+
+    start_msg = next((m for m in sent_messages if m["type"] == "http.response.start"), None)
+    body_msg = next((m for m in sent_messages if m["type"] == "http.response.body"), None)
+    status = start_msg["status"] if start_msg else None
+    resp_headers = dict(start_msg.get("headers", [])) if start_msg else {}
+    body = body_msg.get("body", b"") if body_msg else b""
+    return status, resp_headers, body
+
+
+def test_declared_content_length_greater_than_64kb_immediate_413():
+    """Declared Content-Length > 64 KiB triggers immediate 413 with X-Request-ID."""
+    custom_req_id = "cl-too-large-id-01"
+    headers = [
+        (b"content-length", b"70000"),
+        (b"content-type", b"application/json"),
+        (b"x-request-id", custom_req_id.encode("latin1")),
+    ]
+    status, resp_headers, body = asyncio.run(
+        _raw_asgi_post(app, headers=headers, chunks=[])
+    )
+    assert status == 413
+    assert b"Request payload too large (max 64KB)" in body
+    assert b"x-request-id" in resp_headers
+    assert resp_headers[b"x-request-id"] == custom_req_id.encode("latin1")
+
+
+def test_actual_body_greater_than_64kb_omitted_content_length_returns_413():
+    """Actual body > 64 KiB with Content-Length omitted triggers 413."""
+    custom_req_id = "omitted-cl-too-large-02"
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"x-request-id", custom_req_id.encode("latin1")),
+    ]
+    chunks = [{"type": "http.request", "body": b"A" * 70000, "more_body": False}]
+    status, resp_headers, body = asyncio.run(
+        _raw_asgi_post(app, headers=headers, chunks=chunks)
+    )
+    assert status == 413
+    assert b"Request payload too large (max 64KB)" in body
+    assert resp_headers[b"x-request-id"] == custom_req_id.encode("latin1")
+
+
+def test_actual_body_greater_than_64kb_falsely_small_content_length_returns_413():
+    """Actual body > 64 KiB while declared Content-Length is falsely smaller triggers 413."""
+    custom_req_id = "false-cl-too-large-03"
+    headers = [
+        (b"content-length", b"50"),  # Deceptive small Content-Length
+        (b"content-type", b"application/json"),
+        (b"x-request-id", custom_req_id.encode("latin1")),
+    ]
+    chunks = [{"type": "http.request", "body": b"B" * 70000, "more_body": False}]
+    status, resp_headers, body = asyncio.run(
+        _raw_asgi_post(app, headers=headers, chunks=chunks)
+    )
+    assert status == 413
+    assert b"Request payload too large (max 64KB)" in body
+    assert resp_headers[b"x-request-id"] == custom_req_id.encode("latin1")
+
+
+def test_body_delivered_over_multiple_asgi_chunks_exceeding_limit_returns_413():
+    """Body delivered across multiple ASGI receive chunks whose total exceeds 64 KiB triggers 413."""
+    custom_req_id = "multichunk-too-large-04"
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"x-request-id", custom_req_id.encode("latin1")),
+    ]
+    chunks = [
+        {"type": "http.request", "body": b"C" * 40000, "more_body": True},
+        {"type": "http.request", "body": b"D" * 30000, "more_body": False},
+    ]
+    status, resp_headers, body = asyncio.run(
+        _raw_asgi_post(app, headers=headers, chunks=chunks)
+    )
+    assert status == 413
+    assert b"Request payload too large (max 64KB)" in body
+    assert resp_headers[b"x-request-id"] == custom_req_id.encode("latin1")
+
+
+def test_body_exactly_at_or_below_boundary_passes_size_middleware(monkeypatch):
+    """Body exactly at 65,536 bytes (64 KiB) passes size middleware without 413."""
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+    # Build valid JSON up to exactly 65536 bytes
+    prefix = b'{"question":"hi","padding":"'
+    suffix = b'"}'
+    padding_needed = 65536 - len(prefix) - len(suffix)
+    exact_body = prefix + (b"p" * padding_needed) + suffix
+    assert len(exact_body) == 65536
+
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {"answer": "Processed successfully", "complexity": "simple", "workflow_used": "direct"},
+    )
+
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", b"65536"),
+        (b"x-request-id", b"boundary-exact-64kb"),
+    ]
+    chunks = [{"type": "http.request", "body": exact_body, "more_body": False}]
+    status, resp_headers, body = asyncio.run(
+        _raw_asgi_post(app, headers=headers, chunks=chunks)
+    )
+    assert status == 200, f"Expected 200 at exact 64 KiB boundary, got {status}: {body}"
+    assert b"Processed successfully" in body
+
+
+def test_normal_json_request_reaches_endpoint(monkeypatch):
+    """Normal JSON request below 64 KiB reaches endpoint and parses correctly."""
+    monkeypatch.setenv("HARSHU_AUTH_DISABLED", "true")
+    monkeypatch.setattr(
+        "harshu_ai_os.api.main.execute_request",
+        lambda q: {"answer": f"Echo: {q}", "complexity": "simple", "workflow_used": "direct"},
+    )
+
+    resp = client.post("/ask", json={"question": "What is Python?"})
+    assert resp.status_code == 200
+    assert resp.json()["answer"] == "Echo: What is Python?"
+
+
+def test_oversized_body_contents_never_appear_in_logs():
+    """Payload bytes from rejected requests must never leak into server logs."""
+    from harshu_ai_os.tests.test_observability import LogCaptureHandler
+
+    handler = LogCaptureHandler()
+    obs_logger = logging.getLogger("harshu_ai_os")
+    obs_logger.addHandler(handler)
+    obs_logger.setLevel(logging.INFO)
+
+    secret_oversized_content = "TOP_SECRET_OVERSIZED_PAYLOAD_CANARY_VALUE_XYZ"
+    oversized_body = (secret_oversized_content * 1600).encode("utf-8")
+    assert len(oversized_body) > 65536
+
+    try:
+        req_id = "oversized-no-log-canary"
+        headers = [
+            (b"content-type", b"application/json"),
+            (b"x-request-id", req_id.encode("latin1")),
+        ]
+        chunks = [{"type": "http.request", "body": oversized_body, "more_body": False}]
+        status, resp_headers, body = asyncio.run(
+            _raw_asgi_post(app, headers=headers, chunks=chunks)
+        )
+        assert status == 413
+        assert resp_headers[b"x-request-id"] == req_id.encode("latin1")
+
+        all_logs = " ".join(handler.formatted_lines)
+        assert secret_oversized_content not in all_logs
+        assert "TOP_SECRET" not in all_logs
+    finally:
+        obs_logger.removeHandler(handler)

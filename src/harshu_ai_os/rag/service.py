@@ -116,10 +116,11 @@ def build_rag_result(
     abstained: bool,
     judge_reason: str,
     citations: list[dict],
-    retrieval_ms: float,
-    judge_ms: float,
-    generation_ms: float,
-    total_ms: float,
+    retrieval_ms: float | None = None,
+    judge_ms: float | None = None,
+    generation_ms: float | None = None,
+    total_ms: float = 0.0,
+    reranking_ms: float | None = None,
 ) -> dict:
     """Build the response once so every RAG exit uses the same fields."""
     result = {
@@ -138,6 +139,8 @@ def build_rag_result(
         "generation_ms": generation_ms,
         "total_ms": total_ms,
     }
+    if reranking_ms is not None:
+        result["reranking_ms"] = reranking_ms
     if "reranker_scores" in retrieval:
         result["reranker_scores"] = retrieval["reranker_scores"]
     return result
@@ -169,8 +172,10 @@ def answer_with_chroma_rag(
         retrieval = query_notes(collection, client, question)
     retrieval_ms = elapsed_ms(retrieval_started_at)
 
+    reranking_ms: float | None = None
     # Optional second-stage reranking: score question/chunk pairs and keep top_k.
     if enable_reranking:
+        reranking_started_at = perf_counter()
         try:
             retrieval = rerank_candidates(question, retrieval, top_k=top_k)
         except Exception as error:
@@ -184,6 +189,7 @@ def answer_with_chroma_rag(
                 "distances": retrieval["distances"][:top_k],
                 "metadatas": retrieval["metadatas"][:top_k],
             }
+        reranking_ms = elapsed_ms(reranking_started_at)
 
     all_context = "\n\n".join(retrieval["texts"])
 
@@ -197,8 +203,9 @@ def answer_with_chroma_rag(
             judge_reason="Distance filter threshold exceeded.",
             citations=[],
             retrieval_ms=retrieval_ms,
-            judge_ms=0.0,
-            generation_ms=0.0,
+            reranking_ms=reranking_ms,
+            judge_ms=None,
+            generation_ms=None,
             total_ms=elapsed_ms(total_started_at),
         )
 
@@ -232,8 +239,9 @@ def answer_with_chroma_rag(
             judge_reason=reason,
             citations=[],
             retrieval_ms=retrieval_ms,
+            reranking_ms=reranking_ms,
             judge_ms=judge_ms,
-            generation_ms=0.0,
+            generation_ms=None,
             total_ms=elapsed_ms(total_started_at),
         )
 
@@ -266,6 +274,7 @@ def answer_with_chroma_rag(
         judge_reason=verdict.reason,
         citations=citations,
         retrieval_ms=retrieval_ms,
+        reranking_ms=reranking_ms,
         judge_ms=judge_ms,
         generation_ms=generation_ms,
         total_ms=elapsed_ms(total_started_at),

@@ -94,18 +94,19 @@ def ask(request: AskRequest):
     """Handle unified request orchestration (Direct, Agent, or Strict RAG)."""
     try:
         result = execute_request(request.question)
+        telem = {
+            "event": "ai_workflow_completed",
+            "workflow": result.get("workflow_used", "direct"),
+            "model": result.get("model"),
+            "complexity": result.get("complexity", "general"),
+            "tool_calls_count": result.get("tool_calls_count", 0),
+            "tool_name": result.get("tool_name"),
+            "abstained": result.get("abstained", False),
+            "abstention_reason": result.get("abstention_reason"),
+        }
         logger.info(
             "ai_workflow_completed",
-            extra={
-                "event": "ai_workflow_completed",
-                "workflow": result.get("workflow_used", "direct"),
-                "model": result.get("model", ""),
-                "complexity": result.get("complexity", "general"),
-                "tool_calls_count": result.get("tool_calls_count", 0),
-                "tool_name": result.get("tool_name"),
-                "abstained": result.get("abstained", False),
-                "abstention_reason": result.get("abstention_reason"),
-            },
+            extra=telem,
         )
         return {
             "answer": result.get("answer", ""),
@@ -156,22 +157,25 @@ def ask_rag(request: AskRequest):
             maximum_distance=DEFAULT_MAXIMUM_DISTANCE,
         )
 
+        rag_telemetry = {
+            "event": "ai_workflow_completed",
+            "workflow": "strict_rag",
+            "model": route["model"],
+            "complexity": classification.complexity,
+            "retrieval_ms": result.get("retrieval_ms"),
+            "judge_ms": result.get("judge_ms"),
+            "generation_ms": result.get("generation_ms"),
+            "abstained": result.get("abstained", False),
+            "abstention_reason": result.get("abstention_reason"),
+        }
+        if "reranking_ms" in result:
+            rag_telemetry["reranking_ms"] = result.get("reranking_ms")
         logger.info(
             "ai_workflow_completed",
-            extra={
-                "event": "ai_workflow_completed",
-                "workflow": "strict_rag",
-                "model": route["model"],
-                "complexity": classification.complexity,
-                "retrieval_ms": result.get("retrieval_ms", 0.0),
-                "judge_ms": result.get("judge_ms", 0.0),
-                "generation_ms": result.get("generation_ms", 0.0),
-                "abstained": result.get("abstained", False),
-                "abstention_reason": result.get("abstention_reason"),
-            },
+            extra=rag_telemetry,
         )
 
-        return {
+        response_data = {
             "answer": result["answer"],
             "complexity": classification.complexity,
             "model": route["model"],
@@ -183,11 +187,14 @@ def ask_rag(request: AskRequest):
             "abstained": result["abstained"],
             "abstention_reason": result["abstention_reason"],
             "judge_reason": result.get("judge_reason"),
-            "retrieval_ms": result.get("retrieval_ms", 0.0),
-            "judge_ms": result.get("judge_ms", 0.0),
-            "generation_ms": result.get("generation_ms", 0.0),
-            "total_ms": result.get("total_ms", 0.0),
+            "retrieval_ms": result.get("retrieval_ms"),
+            "judge_ms": result.get("judge_ms"),
+            "generation_ms": result.get("generation_ms"),
+            "total_ms": result.get("total_ms"),
         }
+        if "reranking_ms" in result:
+            response_data["reranking_ms"] = result.get("reranking_ms")
+        return response_data
 
     except LLMServiceError as error:
         logger.error(

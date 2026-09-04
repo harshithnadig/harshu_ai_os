@@ -1,5 +1,6 @@
 """Pure ASGI HTTP observability middleware for request tracing and metrics."""
 
+import json
 import time
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -12,12 +13,15 @@ from harshu_ai_os.observability.context import (
 )
 from harshu_ai_os.observability.logging import log_event
 
+MAX_PAYLOAD_BYTES = 65536  # 64 KiB
+
 
 class ObservabilityMiddleware:
     """Pure ASGI middleware that manages request IDs, duration, and structured logs.
 
     Implemented as pure ASGI to avoid ContextVar propagation issues in BaseHTTPMiddleware.
     All per-request mutable state is local to __call__ or stored in ContextVars.
+    Enforces maximum payload size against both Content-Length headers and actual received bytes.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -53,18 +57,7 @@ class ObservabilityMiddleware:
             path=path,
         )
 
-        # Enforce maximum payload size limit (64 KB)
-        content_length: int | None = None
-        for h_name, h_val in scope.get("headers", []):
-            if h_name.lower() == b"content-length":
-                try:
-                    content_length = int(h_val.decode("latin1"))
-                except Exception:
-                    pass
-                break
-
-        if content_length is not None and content_length > 65536:
-            import json
+        async def send_413_payload_too_large() -> None:
             resp_body = json.dumps({"detail": "Request payload too large (max 64KB)"}).encode("utf-8")
             await send({
                 "type": "http.response.start",
@@ -79,6 +72,7 @@ class ObservabilityMiddleware:
                 "type": "http.response.body",
                 "body": resp_body,
             })
+            duration_ms = max(0.0, round((time.perf_counter() - start_time) * 1000, 2))
             log_event(
                 "INFO",
                 "http_request_completed",
@@ -86,10 +80,71 @@ class ObservabilityMiddleware:
                 method=method,
                 path=path,
                 status_code=413,
-                duration_ms=0.0,
+                duration_ms=duration_ms,
             )
+
+        # 1. Early rejection optimization if declared Content-Length exceeds limit
+        content_length: int | None = None
+        for h_name, h_val in scope.get("headers", []):
+            if h_name.lower() == b"content-length":
+                try:
+                    content_length = int(h_val.decode("latin1"))
+                except Exception:
+                    pass
+                break
+
+        if content_length is not None and content_length > MAX_PAYLOAD_BYTES:
+            await send_413_payload_too_large()
             reset_request_id(token)
             return
+
+        # 2. Enforce limit against actual bytes received
+        received_chunks: list[bytes] = []
+        total_bytes = 0
+        payload_too_large = False
+
+        while True:
+            message = await receive()
+            if message["type"] == "http.request":
+                chunk = message.get("body", b"")
+                total_bytes += len(chunk)
+                if total_bytes > MAX_PAYLOAD_BYTES:
+                    payload_too_large = True
+                    break
+                received_chunks.append(chunk)
+                if not message.get("more_body", False):
+                    break
+            elif message["type"] == "http.disconnect":
+                reset_request_id(token)
+                return
+
+        if payload_too_large:
+            await send_413_payload_too_large()
+            reset_request_id(token)
+            return
+
+        # 3. Replay received chunks for downstream application
+        chunk_idx = 0
+
+        async def replay_receive() -> Message:
+            nonlocal chunk_idx
+            if chunk_idx < len(received_chunks):
+                chunk = received_chunks[chunk_idx]
+                chunk_idx += 1
+                more = chunk_idx < len(received_chunks)
+                return {
+                    "type": "http.request",
+                    "body": chunk,
+                    "more_body": more,
+                }
+            if not received_chunks and chunk_idx == 0:
+                chunk_idx = 1
+                return {
+                    "type": "http.request",
+                    "body": b"",
+                    "more_body": False,
+                }
+            return {"type": "http.disconnect"}
 
         async def send_wrapper(message: Message) -> None:
             nonlocal status_code
@@ -103,7 +158,7 @@ class ObservabilityMiddleware:
             await send(message)
 
         try:
-            await self.app(scope, receive, send_wrapper)
+            await self.app(scope, replay_receive, send_wrapper)
             duration_ms = max(0.0, round((time.perf_counter() - start_time) * 1000, 2))
             log_event(
                 "INFO",
