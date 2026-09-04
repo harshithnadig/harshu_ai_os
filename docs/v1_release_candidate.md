@@ -24,10 +24,10 @@ Harshu AI OS implements a single-node, truthful GenAI orchestration runtime expo
 3. **Bounded Agent ReAct Path (`/ask/agent`):**
    - Deterministic bounded step loop (`DEFAULT_MAX_STEPS = 5`).
    - Strict tool allowlist (`rag_lookup`, `web_search`) preventing arbitrary shell, network, or filesystem mutations.
-   - Guardrails against repeated identical calls, malformed tool arguments, and argument bloat.
+   - Guardrails against repeated identical calls, malformed tool arguments, and string argument truncation at 2,000 characters (`src/harshu_ai_os/agents/loop.py:104-105`).
 4. **Model Context Protocol (MCP) Server Adapter:**
    - Stateless server conforming to the official MCP specification (`2026-07-28`) via `mcp>=2.1.1`.
-   - Read-only tools (`rag_lookup`, `system_status`) with bounds and truthful component health inspection.
+   - Read-only tools: `rag_lookup` (query bounded to 1,000 characters in `src/harshu_ai_os/mcp/server.py:62-63`) and `system_status` with truthful component health inspection.
 
 ---
 
@@ -36,7 +36,7 @@ Harshu AI OS implements a single-node, truthful GenAI orchestration runtime expo
 All checks executed locally from clean working environment:
 
 - **Ruff Linter:** `uv run ruff check .` → **Clean (0 errors, 0 warnings)**.
-- **Pytest Suite:** `uv run pytest` → **184 passed, 1 warning in 12.03s**.
+- **Pytest Suite:** `uv run pytest` → **184 passed, 1 warning in 12.01s**.
 - **Formatting / Diff Integrity:** `git diff --check` → **Clean (0 formatting conflicts)**.
 - **Compose Specification:** `docker compose config` → **Syntactically and semantically valid**.
 
@@ -59,16 +59,24 @@ Executed via `uv run python src/harshu_ai_os/evaluations/run_evaluation.py`:
 
 ## 4. Deployment & Chaos Evidence
 
+Strict Evidence Classification:
+- **TESTED:** Deterministic test exercised local code behavior.
+- **SIMULATED:** Failure or environment condition was injected or modeled.
+- **RUNTIME-PROVEN:** Actual relevant runtime, component, or script path was executed.
+- **HISTORICALLY RUNTIME-PROVEN:** Validated by prior real execution in repository history/commits.
+- **NOT RUNTIME PROVEN:** Not executed against the live subsystem in the current session.
+
 | Chaos / Deployment Scenario | Implementation | Evidence Status | Verification Method |
 | :--- | :--- | :--- | :--- |
-| **Transient LLM Flapping Recovery** | Exponential backoff retry | **RUNTIME-PROVEN** | Pytest unit/integration test with mock transient failures |
-| **LLM Retry Exhaustion** | 3 bounded attempts, fail closed | **RUNTIME-PROVEN** | `test_chaos_llm_retry_exhaustion_fails_closed` (exits after 3 attempts) |
-| **Permanent LLM Failure** | Immediate fail-closed, no retry | **RUNTIME-PROVEN** | `test_chaos_permanent_llm_failure_no_retry` (1 attempt only) |
-| **Adversarial RAG Context** | Sufficiency judge abstention | **RUNTIME-PROVEN** | `test_chaos_adversarial_rag_empty_abstention` |
-| **Oversized Request Attack** | Dual-phase 64 KiB rejection | **RUNTIME-PROVEN** | ASGI chunk streaming test returning HTTP 413 |
-| **Preflight Deployment Tag Rejection** | Rejection of `latest` or empty tag | **SIMULATED** | `test_simulated_deployment_preflight_tag_rejection` & script preflight check |
+| **Transient LLM Flapping Recovery** | Exponential backoff retry | **SIMULATED / TESTED** | `test_1_primary_service_unavailable_retries_then_activates_fallback` (injected transient 503) |
+| **LLM Retry Exhaustion** | 3 bounded attempts, fail closed | **SIMULATED / TESTED** | `test_chaos_llm_retry_exhaustion_fails_closed` (injected persistent 503, fails closed after 3 attempts) |
+| **Permanent LLM Failure** | Immediate fail-closed, no retry | **SIMULATED / TESTED** | `test_chaos_permanent_llm_failure_no_retry` (injected auth error, fails immediately on attempt 1) |
+| **Adversarial RAG Context** | Sufficiency judge abstention | **TESTED** | `test_chaos_adversarial_rag_empty_abstention` (real RAG components with synthetic empty/unrelated input) |
+| **Oversized Request Attack** | Dual-phase 64 KiB rejection | **TESTED** | `test_payload_size_limit_rejected` & ASGI chunk streaming tests returning HTTP 413 |
+| **Healthy Local Deployment** | Container start & health polling | **HISTORICALLY RUNTIME-PROVEN** | Proven in commit `c5948ef`; SIMULATED in current session |
+| **Bad / Missing Image Preflight** | Rejection of `latest` or bad tag | **HISTORICALLY RUNTIME-PROVEN** / **TESTED (Session)** | Tested live in commit `c5948ef`; Python preflight logic tested via `test_simulated_deployment_preflight_tag_rejection` |
 | **Post-Replacement Rollback Logic** | State transition on failed health | **SIMULATED** | `test_simulated_deployment_rollback_decision_logic` |
-| **Container Engine Rollback Execution** | Local Docker daemon restart | **NOT RUNTIME-PROVEN** | Local workstation Docker daemon permission denied (`/var/run/docker.sock`) |
+| **Container Engine Rollback Execution** | Local Docker daemon restart | **NOT RUNTIME PROVEN** | Local workstation Docker daemon permission denied (`/var/run/docker.sock`) |
 
 ---
 
@@ -78,11 +86,13 @@ Executed via `uv run python src/harshu_ai_os/evaluations/run_evaluation.py`:
    - Missing `HARSHU_API_KEY` without `HARSHU_AUTH_DISABLED=true` returns HTTP 503 (service unconfigured).
    - Invalid credentials return HTTP 401 using constant-time `hmac.compare_digest`.
    - `/health` and `/ready` probes remain unauthenticated for orchestration monitors.
-2. **AI Telemetry Truthfulness:**
+2. **Request ID Validation & Bounds:**
+   - Client-supplied `X-Request-ID` headers are sanitized and bounded to 128 characters (`MAX_REQUEST_ID_LENGTH = 128` in `src/harshu_ai_os/observability/context.py:11`). Overly long or malformed IDs are rejected and replaced with a valid UUID4 (`test_malformed_and_overly_long_request_ids_safely_handled`).
+3. **AI Telemetry Truthfulness:**
    - Stage latencies (`retrieval_ms`, `reranking_ms`, etc.) are nullable and serialize as `null` or omitted when unexecuted, never fabricated as `0.0`.
    - Missing token usage, cost, and provider details are omitted from logs rather than fabricated as zeros or empty strings.
    - Known zeros (e.g., `tool_calls_count = 0` when zero tools were invoked) are explicitly distinguished from unknown values.
-3. **Payload Sanitization & Boundary:**
+4. **Payload Sanitization & Boundary:**
    - Requests exceeding 64 KiB are rejected at the ASGI layer before JSON parsing; body contents are never logged.
    - Authorization headers, API keys, and sensitive queries are masked in structured logs.
 
