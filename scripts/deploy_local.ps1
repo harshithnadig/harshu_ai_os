@@ -1,13 +1,13 @@
 # ==============================================================================
 # Harshu AI OS - Local Production Deployment Simulation Script
 # ==============================================================================
-# Deploys an immutable GHCR Docker image tag to a local container simulation
+# Deploys a commit-pinned GHCR Docker image tag to a local container simulation
 # with preflight validation, health check polling, and automated rollback.
 # ==============================================================================
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Immutable GHCR image tag to deploy (e.g., sha-3d4f8eb)")]
+    [Parameter(Mandatory = $true, Position = 0, HelpMessage = "Commit-pinned GHCR image tag to deploy (e.g., sha-3d4f8eb)")]
     [ValidateNotNullOrEmpty()]
     [string]$ImageTag,
 
@@ -49,12 +49,12 @@ if ([string]::IsNullOrWhiteSpace($cleanTag)) {
 
 if ($cleanTag -eq 'latest' -or $cleanTag -like '*:latest') {
     Write-Host '[ERROR] Safety violation: Deploying mutable tag "latest" is prohibited.' -ForegroundColor Red
-    Write-Host '        Please provide an immutable tag (e.g. sha-3d4f8eb).' -ForegroundColor Yellow
+    Write-Host '        Please provide a commit-pinned tag (e.g. sha-3d4f8eb). Note that true content immutability requires @sha256 digests.' -ForegroundColor Yellow
     exit 1
 }
 
 if (-not $cleanTag.StartsWith('sha-', [System.StringComparison]::OrdinalIgnoreCase)) {
-    Write-Host "[WARNING] Image tag '$cleanTag' does not follow the immutable 'sha-*' naming convention." -ForegroundColor Yellow
+    Write-Host "[WARNING] Image tag '$cleanTag' does not follow the commit-traceable 'sha-*' naming convention." -ForegroundColor Yellow
 }
 
 $FullImage = "$RegistryBase`:$cleanTag"

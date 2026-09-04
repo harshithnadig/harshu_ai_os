@@ -2,7 +2,7 @@
 # ==============================================================================
 # Harshu AI OS - Local Production Deployment Script (POSIX / Linux)
 # ==============================================================================
-# Deploys an immutable GHCR Docker image tag to a local container simulation
+# Deploys a commit-pinned GHCR Docker image tag to a local container simulation
 # with preflight validation, health check polling, and automated rollback.
 # ==============================================================================
 
@@ -33,7 +33,7 @@ CLEAN_TAG="${IMAGE_TAG#${REGISTRY_BASE}:}"
 
 if [[ "${CLEAN_TAG}" == "latest" || "${CLEAN_TAG}" == *":latest" ]]; then
     echo "[ERROR] Refusing to deploy mutable tag '${CLEAN_TAG}'."
-    echo "Production deployments must target immutable tags (e.g., sha-xxxxxxx)."
+    echo "Deployments must target commit-pinned tags (e.g., sha-xxxxxxx). Note that true content immutability requires @sha256 digests."
     exit 1
 fi
 

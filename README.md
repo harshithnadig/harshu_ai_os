@@ -271,7 +271,7 @@ To pull the latest release image:
 docker pull ghcr.io/harshithnadig/harshu_ai_os:latest
 ```
 
-To pull a specific immutable commit build (recommended for deterministic production deployments and rollbacks):
+To pull a specific commit-pinned build (recommended for deterministic release candidate deployments and rollbacks):
 
 ```bash
 docker pull ghcr.io/harshithnadig/harshu_ai_os:sha-<commit_sha>
