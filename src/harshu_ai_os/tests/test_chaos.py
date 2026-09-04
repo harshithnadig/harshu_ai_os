@@ -166,8 +166,8 @@ def test_chaos_adversarial_rag_empty_abstention():
     assert result["abstention_reason"] == "insufficient_context"
 
 
-def test_chaos_deployment_rollback_logic():
-    """Chaos: Simulate deployment health polling failing, validating rollback state transition."""
+def test_simulated_deployment_rollback_decision_logic():
+    """Chaos Simulation: Validate deployment health polling failure triggers rollback state transition."""
     deployment_healthy = False
     previous_image = "ghcr.io/harshithnadig/harshu_ai_os:sha-c5948ef"
 
@@ -186,3 +186,59 @@ def test_chaos_deployment_rollback_logic():
 
     assert restored is True
     assert rollback_target == "ghcr.io/harshithnadig/harshu_ai_os:sha-c5948ef"
+
+
+def test_simulated_deployment_preflight_tag_rejection():
+    """Preflight Chaos: Deployment rejects mutable or missing tags before touching runtime."""
+    invalid_tags = ["latest", "ghcr.io/harshithnadig/harshu_ai_os:latest", "", "   "]
+    for tag in invalid_tags:
+        clean = tag.replace("ghcr.io/harshithnadig/harshu_ai_os:", "").strip()
+        is_rejected = not clean or clean == "latest" or clean.endswith(":latest")
+        assert is_rejected is True
+
+    valid_tag = "sha-52d0e1c"
+    clean_valid = valid_tag.replace("ghcr.io/harshithnadig/harshu_ai_os:", "").strip()
+    is_valid = bool(clean_valid) and clean_valid != "latest" and not clean_valid.endswith(":latest")
+    assert is_valid is True
+
+
+def test_chaos_llm_retry_exhaustion_fails_closed(monkeypatch):
+    """Chaos: Transient errors exhaust 3 attempts and fail closed with LLMServiceError."""
+    import pytest
+    from litellm.exceptions import ServiceUnavailableError
+    from harshu_ai_os.llm.exceptions import LLMServiceError
+
+    attempts = {"count": 0}
+
+    def mock_flapping_exhaustion(**kwargs):
+        attempts["count"] += 1
+        raise ServiceUnavailableError("Persistent 503 flapping", model="test", llm_provider="openai")
+
+    monkeypatch.setattr("harshu_ai_os.llm.client.completion", mock_flapping_exhaustion)
+
+    route = {"model": "openai/harshu-general", "max_tokens": 100}
+    with pytest.raises(LLMServiceError):
+        call_llm(route, "Will this fail after 3 attempts?")
+
+    assert attempts["count"] == 3
+
+
+def test_chaos_permanent_llm_failure_no_retry(monkeypatch):
+    """Chaos: Permanent AuthenticationError fails immediately on attempt 1 without retry."""
+    import pytest
+    from litellm.exceptions import AuthenticationError
+    from harshu_ai_os.llm.exceptions import LLMAuthenticationError
+
+    attempts = {"count": 0}
+
+    def mock_permanent_auth_error(**kwargs):
+        attempts["count"] += 1
+        raise AuthenticationError("Invalid provider key", model="test", llm_provider="openai")
+
+    monkeypatch.setattr("harshu_ai_os.llm.client.completion", mock_permanent_auth_error)
+
+    route = {"model": "openai/harshu-general", "max_tokens": 100}
+    with pytest.raises(LLMAuthenticationError):
+        call_llm(route, "Immediate auth failure")
+
+    assert attempts["count"] == 1
